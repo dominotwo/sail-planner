@@ -41,6 +41,7 @@
     --pin-bg-on:var(--color-accent); --pin-fg-on:#1a1730;
     --halo:#0e0f18;
     --warn-t:#d8a35e;              /* after-dark and caution text, per chart table */
+    --danger:#e0645a; --good:hsl(150 45% 58%); --bad:hsl(8 62% 62%);
     --tile: url(#tileDusk);
     --sea:#0f1420;
     --tile-depth: brightness(.13) saturate(.7) contrast(1.15);
@@ -62,6 +63,15 @@
     --pin-bg-on:#5d5294; --pin-fg-on:var(--color-accent-100);
     --halo:var(--color-neutral-100);
     --warn-t:#7a4a12;              /* the same caution, dark enough for the day ground */
+    /* the dark-palette green and red drop to 1.96:1 and 2.94:1 on this ground —
+       the compare drawer's whole job is those two figures, so they get their own
+       darkened pair here rather than a shared literal */
+    --danger:#a32a20; --good:#1b6b45; --bad:#a32a20;
+    /* elevation is derived from the ground; the shared dark-theme rings are a
+       9.2:1 near-black hairline on this one */
+    --shadow-sm: 0 0 0 1px var(--color-neutral-300);
+    --shadow-md: 0 0 0 1px var(--color-neutral-300), 0 6px 18px rgba(31,35,58,.10);
+    --shadow-lg: 0 0 0 1px var(--color-neutral-300), 0 16px 40px rgba(31,35,58,.16);
     --tile: url(#tileDay);
     --sea:#c9dcea;
     --tile-depth: none;
@@ -93,6 +103,12 @@
     --pin-bg-on:#c2643c; --pin-fg-on:#1b0d08;
     --halo:#070403;
     --warn-t:#e0a06a;
+    --danger:#e0645a; --good:hsl(150 45% 58%); --bad:hsl(8 62% 62%);
+    /* the shared rings are cool grey; on a red-shifted palette they read as a
+       blue halo, so the elevation edge comes off this palette's own line token */
+    --shadow-sm: 0 0 0 1px var(--line);
+    --shadow-md: 0 0 0 1px var(--line), 0 6px 18px rgba(0,0,0,.6);
+    --shadow-lg: 0 0 0 1px #5c2d1c, 0 16px 40px rgba(0,0,0,.7);
     /* Water is saturated blue and land is near-neutral, so a plain grayscale
        night filter flattens them together. Rotating hues first drops the sea's
        luminance well below the land's, then the sepia pass carries the red
@@ -190,7 +206,7 @@
   .rt-active { box-shadow:inset 2px 0 0 var(--ac); padding-left:var(--space-3); }
   .rt-meta { font-size:11px; color:var(--muted-2); font-variant-numeric:tabular-nums; }
   .rt-act { display:flex; gap:2px; opacity:0; }
-  .rt:hover .rt-act { opacity:1; }
+  .rt:hover .rt-act, .rt:focus-within .rt-act { opacity:1; }
   .rt-eye { background:transparent; border:0; padding:0; cursor:pointer; display:grid; place-items:center; }
   .rsw { width:12px; height:12px; border-radius:3px; border:1.5px solid; display:block; }
   .rt-edit { min-height:0; padding:1px 5px; font-size:12px; }
@@ -220,7 +236,7 @@
   /* the visual target stays small; the tap target does not */
   .cmpx::after { content:""; position:absolute; inset:-14px; }
   th.rtsel:hover .cmpx, .cmpx:focus-visible { opacity:1; }
-  .cmpx:hover { color:var(--danger, #e0645a); border-color:var(--line-2); }
+  .cmpx:hover { color:var(--danger); border-color:var(--ac-line); }
   @media (hover:none), (max-width:760px){
     .cmpx { width:26px; height:26px; opacity:1; font-size:14px; }
     .cmpx::after { inset:-9px; }
@@ -248,8 +264,8 @@
   .cmp td.empty { color:var(--line); }
   .cmp tr.tot td, .cmp tr.tot th { border-top:1px solid var(--line); padding-top:var(--space-4); }
   .cmp .bestv { color:var(--ac-soft); }
-  .cmp .dg { color:hsl(150 45% 58%); }
-  .cmp .db { color:hsl(8 62% 62%); }
+  .cmp .dg { color:var(--good); }
+  .cmp .db { color:var(--bad); }
   .cmp .dz { color:var(--muted-2); }
   .cmp thead th.rt-active { box-shadow:inset 0 -2px 0 var(--ac); }
 
@@ -300,7 +316,8 @@
   .btn { font-family:inherit; }
   .btn-block { justify-content:flex-start; font-size:12px; min-height:0; padding:var(--space-3) var(--space-4); margin-top:var(--space-3); }
   .btn-block[aria-pressed="true"] { color:var(--ac-soft); border-color:var(--ac); background:var(--ac-fill); }
-  .mini { font-size:11.5px; padding:1px 6px; min-height:0; border:0; }
+  .mini { font-size:11.5px; padding:1px 6px; min-height:0; }
+  .btn-ghost.mini { border:0; }   /* ghost actions lose the border; a real button keeps it */
 
   /* ---------- route ---------- */
   .route-empty { color:var(--muted-2); font-size:11.5px; padding:var(--space-2) 0 var(--space-3); }
@@ -312,7 +329,7 @@
   .rleg.over-top { border-top-color:var(--ac); }
   .rleg.over-bot { border-bottom-color:var(--ac); }
   .rdel { opacity:0; align-self:center; }
-  .rleg:hover .rdel { opacity:1; }
+  .rleg:hover .rdel, .rleg:focus-within .rdel { opacity:1; }
   .radd { margin-top:var(--space-3); }
   .radd select {
     width:100%; font:inherit; font-size:11.5px; color:var(--ac-soft);
@@ -476,8 +493,8 @@
   .tipc b { font-family:var(--font-heading); font-weight:500; font-size:12px; letter-spacing:-.01em; }
   .tipc .kv { display:grid; grid-template-columns:56px minmax(0,1fr); gap:2px var(--space-3); font-size:11px; }
   .tipc .kv span:nth-child(odd) { color:var(--muted-2); text-transform:uppercase; letter-spacing:.06em; font-size:9px; padding-top:1px; }
-  .tipc .note { color:var(--muted-2); font-size:10.5px; font-style:italic; }
-  .tipc .warn { color:var(--danger, #e0645a); font-size:10.5px; }
+  .tipc .note { color:var(--muted); font-size:11px; }
+  .tipc .warn { color:var(--danger); font-size:11px; }
   .zone-lbl {
     background:none !important; border:0 !important; box-shadow:none !important;
     color:var(--muted-2) !important; font-size:9.5px !important; letter-spacing:.1em;
@@ -542,7 +559,12 @@
     background:color-mix(in srgb, var(--color-bg) 96%, transparent);
     font-weight:500;
   }
+  /* The ramp is tuned as a LINE colour against the chart. As text on a
+     page-coloured chip both ends collapse — 33 of 50 hue/magnitude samples fell
+     under 4.5:1 on day, and dusk and night fail at the opposite end. The border
+     carries route identity; the text is just text. */
   .leg-lbl {
+    color:var(--color-text);
     font-size:11.5px; font-variant-numeric:tabular-nums; padding:1px 5px;
     border-radius:var(--radius-sm); background:color-mix(in srgb, var(--color-bg) 86%, transparent);
     border:1px solid var(--line); white-space:nowrap;
@@ -631,7 +653,7 @@
   .pday-tot { margin-left:auto; display:flex; align-items:center; gap:var(--space-4); font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; flex:none; }
   .pday-dark { color:var(--warn-t); display:flex; align-items:center; gap:4px; white-space:nowrap; }
   .pday-act { display:flex; gap:2px; opacity:0; }
-  .pday:hover .pday-act { opacity:1; }
+  .pday:hover .pday-act, .pday:focus-within .pday-act { opacity:1; }
   /* the day as a strip of clock: night either side, legs laid on it */
   /* Night is the ground, twilight a step up, daylight the lit band — three
      values a step apart rather than one faint wash. */
@@ -642,7 +664,13 @@
   }
   .pbar-twi { position:absolute; top:0; bottom:0; background:color-mix(in srgb, var(--ac) 26%, transparent); }
   .pbar-day { position:absolute; top:0; bottom:0; background:color-mix(in srgb, #ffd479 42%, transparent); }
-  :root[data-pal="day"] .pbar-day { background:color-mix(in srgb, #f0b429 46%, transparent); }
+  /* On a light ground a translucent band can only ever darken, so the amber
+     daylight wash came out below the night ground and the ladder inverted.
+     Here the bands are opaque and the polarity flips to match the palette:
+     night is the darkest step, daylight is the paper. */
+  :root[data-pal="day"] .pbar     { background:color-mix(in srgb, var(--color-text) 26%, var(--color-bg)); }
+  :root[data-pal="day"] .pbar-twi { background:color-mix(in srgb, var(--color-text) 14%, var(--color-bg)); }
+  :root[data-pal="day"] .pbar-day { background:color-mix(in srgb, #f0b429 8%, var(--color-bg)); }
   .pbarw { position:relative; padding:11px 0 12px; margin:2px 0 var(--space-2); }
   .pbarw .pbar { margin:0; }
   .ptide { position:relative; height:26px; margin:14px 0 var(--space-3); color:var(--ac-soft); }
@@ -1411,7 +1439,20 @@ function legCalc(A,B){
 
 /* ---------------- state ---------------- */
 const LS='sailplanner.v4';
-const FRESH = !localStorage.getItem(LS);   // first visit: pick sensible defaults for the viewport
+/* localStorage can *throw* rather than return null — Chrome and Edge with
+   cookies blocked, and any partitioned third-party context. Reading it through
+   one gate means a blocked store degrades to a fresh session instead of killing
+   the page before the map is built. */
+const lsGet = () => { try{ return localStorage.getItem(LS); }catch(e){ return null; } };
+const FRESH = !lsGet();                    // first visit: pick sensible defaults for the viewport
+
+/* A first visit opens on a real passage rather than an empty route drawn over
+   fifteen pairwise legs. Newport out to Emerald Bay, west to Santa Barbara
+   Island, down to Avalon and home — so the route panel, the matrix, the day
+   plan and the three exporters all have something in them on load. Returning
+   visitors keep whatever they saved; every default below is gated on FRESH. */
+const DEMO = ['nwp','eme','sbi','ava','nwp'];
+const DEMO_START = '2026-08-27';
 /* Route identity hues, deliberately clear of the pairwise magnitude ramps
    (amber 42° on dusk/night, crimson 335° on day) and of each other. Colour is
    assigned by position among the SHOWN routes, so the ≤3 on the map can never
@@ -1420,11 +1461,12 @@ const FRESH = !localStorage.getItem(LS);   // first visit: pick sensible default
 const HUES=[190,285,105,225,60];
 const S = Object.assign({
   locs: SEED.map(l=>({...l, on:true})),
-  mode:'dist', mxMode:'dist', unit:'nm', legsView:'all', pal:'dusk', spd:6, tack:true, wdir:293, tws:12,
-  route:[], drawer:false, planOpen:false, plans:{}, clock24:true, depTime:'08:00', tides:false, mxOpen:false, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
-  routes:[{id:'r1', name:'Route 1', hue:HUES[0], stops:[]}],
+  mode:'dist', mxMode:'dist', unit:'nm', legsView: FRESH?'route':'all', pal:'dusk', spd:6, tack:true, wdir:293, tws:12,
+  route: FRESH?[...DEMO]:[], drawer:false, planOpen:false, plans: FRESH?{r1:{start:DEMO_START, days:[], dep:{}}}:{}, clock24:true, depTime:'08:00', tides:false, mxOpen:false, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
+  routes:[{id:'r1', name: FRESH?'Island loop':'Route 1', hue:HUES[0], stops: FRESH?[...DEMO]:[]}],
   activeRoute:'r1', shown:['r1'], baseline:'r1'
-}, (()=>{ try{ return JSON.parse(localStorage.getItem(LS))||{}; }catch(e){ return {}; } })());
+}, (()=>{ try{ return JSON.parse(lsGet())||{}; }catch(e){ return {}; } })());
+if(!Array.isArray(S.locs)) S.locs = SEED.map(l=>({...l, on:true}));   // a hand-edited or truncated blob must not kill the page
 S.locs = S.locs.map(l=>({...l}));
 if(!Array.isArray(S.routes) || !S.routes.length) S.routes=[{id:'r1',name:'Route 1',hue:HUES[0],stops:S.route||[]}];
 S.routes.forEach((r,i)=>{ r.stops=r.stops||[]; if(r.hue==null) r.hue=HUES[i%HUES.length]; });
@@ -1679,6 +1721,42 @@ function ramp(t){
   const c=STOPS[i].map((v,k)=>Math.round(v+(STOPS[i+1][k]-v)*f));
   return `rgb(${c.join(',')})`;
 }
+/* Matrix cells tint with the ramp, so the text on them has to be chosen from
+   the composited tint's own luminance. The old fixed `t > .62` cut matched no
+   palette's crossover — it made contrast *worse* at the boundary in all three,
+   and on the light palette it flipped the wrong way at both ends, since there
+   --color-bg is the light token. Picking whichever type token contrasts better
+   is correct in every palette and survives later edits to RAMPS or the alpha. */
+let palProbe=null, palCache={pal:null};
+function tokenRGB(name){
+  if(palCache.pal!==S.pal) palCache={pal:S.pal};
+  if(palCache[name]) return palCache[name];
+  if(!palProbe){
+    palProbe=document.createElement('span');
+    palProbe.style.cssText='position:absolute;width:0;height:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(palProbe);
+  }
+  palProbe.style.backgroundColor='var('+name+')';
+  const m=getComputedStyle(palProbe).backgroundColor.match(/[\d.]+/g);
+  return palCache[name] = m? m.slice(0,3).map(Number) : [0,0,0];
+}
+const sLin = v => { v/=255; return v<=0.04045? v/12.92 : Math.pow((v+0.055)/1.055,2.4); };
+const lum = c => 0.2126*sLin(c[0])+0.7152*sLin(c[1])+0.0722*sLin(c[2]);
+const cRatio = (a,b) => { const x=lum(a),y=lum(b); return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05); };
+/* the tint as actually painted: ramp(t) at (16+t*66)% over the page colour */
+function cellMix(t){
+  const STOPS=RAMPS[S.pal]||RAMPS.dusk;
+  let u=Math.max(0,Math.min(1,t))*(STOPS.length-1);
+  const i=Math.min(STOPS.length-2,Math.floor(u)), f=u-i;
+  const a=(16+t*66)/100, b=tokenRGB('--color-bg');
+  return STOPS[i].map((v,k)=>a*(v+(STOPS[i+1][k]-v)*f)+(1-a)*b[k]);
+}
+function cellFg(t){
+  const c=cellMix(t);
+  return cRatio(tokenRGB('--color-bg'),c) > cRatio(tokenRGB('--color-text'),c)
+    ? 'var(--color-bg)' : 'var(--color-text)';
+}
+
 /* Upwind legs are drawn as an actual tacking zigzag rather than a dashed line —
    the basemap has dashed boundaries of its own, and a sawtooth can't be mistaken
    for one. Geometry is cosmetic; distances come from the straight path. */
@@ -1885,7 +1963,7 @@ function draw(){
     if(!anchor) return;
     lblLayer.addLayer(L.marker(map.containerPointToLatLng(anchor),{ interactive:false, icon:L.divIcon({
       className:'', iconSize:null,
-      html:`<div class="leg-lbl ${selLeg?'sel':''}" style="color:${col};border-color:${selLeg||on?col:'var(--line)'}">${txt}</div>`
+      html:`<div class="leg-lbl ${selLeg?'sel':''}" style="border-color:${selLeg||on?col:'var(--line)'}">${txt}</div>`
     })}));
   });
 
@@ -1961,7 +2039,7 @@ function matrix(L2){
     const v = M==='dist'? l.d : ((l.A===A)? l.fwd.t : l.rev.t);
     const t = nrm(v);
     // same ramp as the map: the cell tint reads as “near → far” at a glance
-    return `<td ${tag}><span class="cellv" style="background:color-mix(in srgb, ${ramp(t)} ${16+t*66}%, transparent)${t>.62?';color:var(--color-bg)':''}">${M==='dist'? distLbl(l.d) : hm(v)}</span></td>`;
+    return `<td ${tag}><span class="cellv" style="background:color-mix(in srgb, ${ramp(t)} ${16+t*66}%, transparent);color:${cellFg(t)}">${M==='dist'? distLbl(l.d) : hm(v)}</span></td>`;
   };
   const head = '<tr><th></th>'+a.map(l=>`<th data-loc="${l.id}"><span class="mxh"><span class="vname">${l.name}</span><span class="pin-no">${no(l)}</span></span></th>`).join('')+'</tr>';
   const body = a.map((r,i)=>`<tr><th data-loc="${r.id}"><span class="mxr"><span class="pin-no">${no(r)}</span>${r.name}</span></th>${a.map((_,j)=>cell(i,j)).join('')}</tr>`).join('');
@@ -3600,7 +3678,7 @@ document.getElementById('planCsv').addEventListener('click', ()=>{
   });
   const tot=x.S2.days.reduce((s,d)=>s+d.hours,0);
   rows.push([]);
-  rows.push(['Total','','','','','', distLbl(x.S2.days.reduce((s,d)=>s+d.legs.reduce((t,g)=>t+g.l.d,0),0)), hm(tot),'','','','','at '+S.spd.toFixed(1)+' kt'+(S.tack?', wind '+S.tws.toFixed(0)+' kt from '+Math.round(S.windFrom)+'\u00b0':'')]);
+  rows.push(['Total','','','','','', distLbl(x.S2.days.reduce((s,d)=>s+d.legs.reduce((t,g)=>t+g.l.d,0),0)), hm(tot),'','','','','at '+S.spd.toFixed(1)+' kt'+(S.tack?', wind '+S.tws.toFixed(0)+' kt from '+Math.round(S.wdir)+'\u00b0':'')]);
   dl(planFile(x.r,'csv'), 'text/csv;charset=utf-8', rows.map(rr=>rr.map(q).join(',')).join('\r\n'));
 });
 document.getElementById('planIcs').addEventListener('click', ()=>{
