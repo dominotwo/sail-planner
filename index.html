@@ -2025,8 +2025,16 @@ function setBase(){
   const b=BASES[S.base] || BASES.streets;
   document.documentElement.dataset.base=S.base||'streets';
   if(baseLayer) map.removeLayer(baseLayer);
+  /* crossOrigin matters, and not for canvas: WebKit refuses to apply an SVG
+     url() filter to CROSS-ORIGIN image content, because a colour matrix could
+     be used to read pixels back. Chrome allows it, which is why the palette
+     toning and #keyBlue worked everywhere except iOS - and why a same-origin
+     swatch filters fine there (?ft=1). Requesting the tiles with CORS makes
+     them clean rather than opaque, so the filter is allowed. Both MapTiler and
+     Esri return Access-Control-Allow-Origin: *, so this costs nothing. */
   baseLayer=L.tileLayer(b.url,{attribution:b.attribution, maxZoom:b.maxZoom,
-    maxNativeZoom:b.maxNativeZoom, detectRetina:false, zIndex:1}).addTo(map);
+    maxNativeZoom:b.maxNativeZoom, detectRetina:false, zIndex:1,
+    crossOrigin:'anonymous'}).addTo(map);
   stackSea();
 }const legLayer = L.layerGroup().addTo(map);
 /* Every leg's drawn geometry, kept so the cross-highlight can trace the leg
@@ -2821,7 +2829,7 @@ function setDepth(){
      #flatSea* keys their land out and floods the rest with --sea. */
   const d=DEPTH[S.depth] || ((S.base==='sat' && S.depth==='off')? DEPTH.contour : null);
   if(d){
-    depthLayer = L.tileLayer(d.url,{attribution:d.attribution, maxZoom:d.maxZoom, maxNativeZoom:d.maxNativeZoom, opacity:d.op, className:'depth-tiles', pane:'depth'});
+    depthLayer = L.tileLayer(d.url,{attribution:d.attribution, maxZoom:d.maxZoom, maxNativeZoom:d.maxNativeZoom, opacity:d.op, className:'depth-tiles', pane:'depth', crossOrigin:'anonymous'});
     depthLayer.addTo(map);
   }
   if(atonAttr!==S.marks){
