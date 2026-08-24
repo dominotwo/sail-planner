@@ -1458,7 +1458,8 @@ const LS='sailplanner.v4';
    cookies blocked, and any partitioned third-party context. Reading it through
    one gate means a blocked store degrades to a fresh session instead of killing
    the page before the map is built. */
-const lsGet = () => { try{ return localStorage.getItem(LS); }catch(e){ return null; } };
+const lsGet = (k) => { try{ return localStorage.getItem(k||LS); }catch(e){ return null; } };
+const lsSet = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){} };
 const FRESH = !lsGet();                    // first visit: pick sensible defaults for the viewport
 
 /* A first visit opens on a real passage rather than an empty route drawn over
@@ -1554,7 +1555,7 @@ function routeColor(hue,t,isActive){
   const s = (day? 44+t*50 : 38+t*56) * (isActive?1:.82);
   return `hsl(${Math.round(hue+t*16)} ${Math.round(Math.min(96,s))}% ${Math.round(isActive? l : (day? l+12 : l-10))}%)`;
 }
-const save = () => { try{ syncRoute(); localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} };const byId = id => S.locs.find(l=>l.id===id);
+const save = () => { try{ syncRoute(); lsSet(LS, JSON.stringify(S)); }catch(e){} };const byId = id => S.locs.find(l=>l.id===id);
 /* one sweep of state saved before deletes pruned the other routes */
 S.routes.forEach(r=>{ r.stops=liveStops(r.stops); });
 S.route=liveStops(S.route);
@@ -3814,9 +3815,9 @@ spd.value=S.spd;
 spd.addEventListener('input',()=>{ S.spd=+spd.value; all(); });
 
 const wel=document.getElementById('welcome');
-if(!localStorage.getItem('sp_welcome')) wel.dataset.on='true';
+if(!lsGet('sp_welcome')) wel.dataset.on='true';
 document.getElementById('wgo').addEventListener('click',()=>{
-  wel.dataset.on='false'; localStorage.setItem('sp_welcome','1');
+  wel.dataset.on='false'; lsSet('sp_welcome','1');
 });
 map.attributionControl.addAttribution('Planning only \u2014 not for navigation');
 
