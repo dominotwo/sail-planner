@@ -336,6 +336,9 @@
   .ft-sw { width:26px; height:26px; border-radius:var(--radius-sm); background:#f00; flex:none; }
   .ft-flt { filter:url(#ftGreen); }
   .ft-txt { font-size:11px; color:var(--muted); line-height:1.4; max-width:210px; }
+  .ft-out { flex:1 0 100%; margin:var(--space-2) 0 0; font-size:11px; line-height:1.5;
+    color:var(--color-text); white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .ftest { flex-wrap:wrap; max-width:min(330px, calc(100vw - 72px)); }
   .welcome {
     position:absolute; left:56px; top:var(--space-4); z-index:640; max-width:292px;
     background:var(--color-surface); border:1px solid var(--color-divider);
@@ -1197,7 +1200,8 @@
       <div class="ftest" id="ftest" hidden>
         <span class="ft-sw ft-ctl"></span>
         <span class="ft-sw ft-flt"></span>
-        <span class="ft-txt">left red = control &middot; right GREEN = SVG filters work &middot; right RED = they do not</span>
+        <span class="ft-txt" id="ftTxt">left red = control &middot; right green = filters apply</span>
+        <pre class="ft-out" id="ftOut">reading…</pre>
       </div>
       <div class="welcome" id="welcome" data-on="false">
         <div class="wtitle">Sail Planner</div>
@@ -4124,6 +4128,36 @@ const wel=document.getElementById('welcome');
 if(!lsGet('sp_welcome')) wel.dataset.on='true';
 /* ?ft=1 shows the SVG-filter self test — see the note by .ftest */
 if(/[?&]ft=1\b/.test(location.search)) document.getElementById('ftest').hidden=false;
+/* Everything the chart's look depends on, read off the device rather than
+   inferred. Three separate questions that kept getting conflated: does this
+   browser apply an SVG filter at all, does it apply one to a cross-origin tile,
+   and are the tiles even reaching us CORS-clean. */
+if(/[?&]ft=1\b/.test(location.search)) setTimeout(()=>{
+  const out=document.getElementById('ftOut'); if(!out) return;
+  const L=[];
+  const paneFilter = getComputedStyle(document.querySelector('.leaflet-tile-pane')).filter;
+  L.push('pal      : '+document.documentElement.dataset.pal+'  base:'+document.documentElement.dataset.base);
+  L.push('pane css : '+(paneFilter||'none').slice(0,44));
+  const t=document.querySelector('.leaflet-tile-pane img');
+  L.push('tile attr: crossOrigin='+(t? (t.crossOrigin||'(none)') : 'no tile yet'));
+  out.textContent=L.join('\n')+'\ncanvas   : testing…';
+  if(!t){ return; }
+  /* can we read the tile back? if yes it is CORS-clean and we could filter it
+     ourselves in JS instead of asking CSS to do it */
+  const probe=new Image(); probe.crossOrigin='anonymous';
+  probe.onload=()=>{
+    let verdict;
+    try{
+      const c=document.createElement('canvas'); c.width=c.height=8;
+      const cx=c.getContext('2d'); cx.drawImage(probe,0,0,8,8);
+      cx.getImageData(0,0,1,1);
+      verdict='CLEAN (readable, JS filtering possible)';
+    }catch(e){ verdict='TAINTED ('+e.name+')'; }
+    out.textContent=L.join('\n')+'\ncanvas   : '+verdict;
+  };
+  probe.onerror=()=>{ out.textContent=L.join('\n')+'\ncanvas   : TILE FAILED TO LOAD with CORS'; };
+  probe.src=t.src;
+}, 2500);
 document.getElementById('wgo').addEventListener('click',()=>{
   wel.dataset.on='false'; lsSet('sp_welcome','1');
 });
