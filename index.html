@@ -948,7 +948,16 @@
      the road/urban end back down to the land tone — so the coastline is the
      strongest edge on the chart and the freeway web sinks into the land mass.
      Place names survive; they land just above the land tone. -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<!-- Filter defs. The size and placement here are load-bearing, not cosmetic:
+     WebKit fails to resolve filter: url(#id) against a ZERO-sized SVG, so on
+     iOS (every browser there is WebKit) the whole chain silently did nothing -
+     the water was never keyed out of the land tiles, which hid the sea layer
+     beneath, and the palette toning never applied either. Blink resolves it
+     regardless, which is why it only ever broke on one platform. Give it real
+     dimensions and park it off-canvas instead of collapsing it. Do not set
+     display:none or width/height 0 here. -->
+<svg width="1" height="1" aria-hidden="true" focusable="false"
+     style="position:absolute;left:-10px;top:-10px;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0">
   <!-- Streets keeps its own drawing, so water is keyed by BLUENESS instead of
        luminance: only the blue-dominant pixels drop out, and grey roads, labels
        and parks survive. Chains ahead of the palette recolour. -->
