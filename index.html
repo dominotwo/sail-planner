@@ -3285,7 +3285,19 @@ async function bottomRefresh(){
        case identical while letting a wide view drop to a coarser reference,
        which elevRef already handles: it walks 11 down to Z_MIN and takes the
        first level with data, so a coarser reference is not a worse one. */
-    await elevLoad(b,0.05,REF_BUDGET, Math.min(Z_REF, zoomFor(b, REF_BUDGET)));
+    /* ...and every level below it, because that is what elevRef actually walks.
+       Out in deep water the fine tiles carry an exact 0 for no-data and only
+       the coarse levels hold real soundings, so elevRef tries Z_REF and falls
+       through to Z_MIN. Nothing below the reference was ever loaded, so it had
+       nothing to fall through to: at a z10 view two thirds of the grid came
+       back null and the overlay drew as a few blocky patches over blank water,
+       while a z8 view - where the reference lands on z9, which is clean - had
+       full coverage. Each step down is a quarter of the tiles, so the whole
+       stack costs about a third more than its top level alone. */
+    const zRef = Math.min(Z_REF, zoomFor(b, REF_BUDGET));
+    const stack = [];
+    for(let z=zRef; z>=Z_MIN; z--) stack.push(z);
+    await Promise.all(stack.map(z=>elevLoad(b,0.05,REF_BUDGET,z)));
     const sz=map.getSize();
     const W=Math.max(60,Math.min(300,Math.round(sz.x/3.2))), H=Math.max(48,Math.min(240,Math.round(sz.y/3.2)));
     const n=b.getNorth(), s=b.getSouth(), w=b.getWest(), e=b.getEast();
