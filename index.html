@@ -1975,7 +1975,17 @@ function draw(){
     const geo = smooth(l.pts);
     const lk = l.A.id+'|'+l.B.id, selLeg = S.selLeg===lk;
     legPaths.push({A:l.A.id, B:l.B.id, geo, col, w: on? 3.2+t*2.6 : 1.5+t*1.5});
-    if(on) [0.32,0.68].forEach(f=>arrowAt(geo,f,col));
+    /* geo runs A->B as the pair is stored, but a route may sail it B->A. dir
+       already says which way — dirIn() computes it and the directional time
+       label was already using it — it simply never reached the arrows, so any
+       leg sailed against its stored order drew a mark pointing back the way you
+       came. Reversing a copy fixes the heading and keeps the two marks
+       symmetric about the middle; slice() because legPaths and the hit line
+       above hold the original. */
+    if(on){
+      const ageo = dir===-1? geo.slice().reverse() : geo;
+      [0.32,0.68].forEach(f=>arrowAt(ageo,f,col));
+    }
     // a fat invisible line underneath makes the leg easy to hover without hunting
     const hitLine = L.polyline(geo,{
       color:col, weight:18, opacity:0, lineCap:'round', smoothFactor:0, interactive:true
