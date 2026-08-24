@@ -694,14 +694,18 @@
   :root[data-pal="day"] .pbar-day { background:color-mix(in srgb, #f0b429 8%, var(--color-bg)); }
   .pbarw { position:relative; padding:11px 0 12px; margin:2px 0 var(--space-2); }
   .pbarw .pbar { margin:0; }
-  .ptide { position:relative; height:26px; margin:14px 0 var(--space-3); color:var(--ac-soft); }
+  /* The curve is inset from the row's edges (see TIDE_PAD) and the labels sit
+     wholly outside that band, so a height never lands on the line it belongs to.
+     The margins have to be at least as deep as the label offsets below. */
+  .ptide { position:relative; height:26px; margin:var(--space-6) 0; color:var(--ac-soft); }
   .ptide-c { position:absolute; inset:0; width:100%; height:100%; overflow:visible; opacity:.85; }
   .ptide-wait { font-size:10.5px; color:var(--muted-2); margin-top:var(--space-2); }
   .ptide-e {
-    position:absolute; bottom:-3px; transform:translateX(-50%); font-size:10px;
+    position:absolute; bottom:-12px; transform:translateX(-50%); font-size:10px;
+    line-height:1;                      /* the default 1.45 made these 14.5px tall */
     font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--muted);
   }
-  .ptide-e.hi { top:-11px; bottom:auto; color:var(--ac-soft); }
+  .ptide-e.hi { top:-12px; bottom:auto; color:var(--ac-soft); }
   .pmk {
     position:absolute; transform:translateX(-50%); display:flex; align-items:center;
     color:var(--muted); line-height:0; pointer-events:auto;
@@ -4309,9 +4313,14 @@ function tideBar(d){
   if(!t) return '';
   const lo=Math.min(...t.curve.map(p=>p.v)), hi=Math.max(...t.curve.map(p=>p.v));
   const span=Math.max(0.4, hi-lo);
+  /* Percent of the row held back at top and bottom. Without it the peaks and
+     troughs sit exactly on the row's edges, which is where the high and low
+     labels have to go — so every height printed over the line it marks. */
+  const TIDE_PAD=10;
   const pt=p=>{
     const [H,M]=p.t.split(':').map(Number);
-    return ((H+M/60)/24*100).toFixed(2)+','+(100-((p.v-lo)/span*100)).toFixed(2);
+    const y=TIDE_PAD + (100-2*TIDE_PAD)*(1-(p.v-lo)/span);
+    return ((H+M/60)/24*100).toFixed(2)+','+y.toFixed(2);
   };
   const line=t.curve.map(pt).join(' ');
   const marks=t.events.map(e=>{

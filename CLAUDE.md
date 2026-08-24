@@ -103,6 +103,13 @@ before "discovering" any of them again.
   distinct font sizes where 6 would do, two checkbox implementations, two close
   buttons, four icon-button treatments, and ~45 hard-coded 1–6px paddings
   running a second spacing scale beside the token ramp.
+- **The spacing ramp has holes: it defines 1, 2, 3, 4, 6, 8 — there is no
+  `--space-5` or `--space-7`.** Referencing one is not an error you will see;
+  the declaration is simply dropped and the property falls back to its initial
+  value, so `margin:var(--space-5) 0` silently becomes `margin:0`. That has
+  already caused one layout bug. Every reference in the file currently resolves
+  — check with:
+  `grep -ohE 'var\(--space-[0-9]+' index.html styles.css | sort -u`
 
 Settled design decisions, so don't re-litigate them:
 
