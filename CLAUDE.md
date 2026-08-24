@@ -31,9 +31,16 @@ package manager, no framework. Leaflet 1.9.4 loads from unpkg with an SRI hash.
    tiles per palette.
 4. Markup — `#rail`, `#side` (locations, routes, legend), `#map`, `#ctrls`
    (Conditions), `#mxFloat` (matrix), `#drawer` (compare), `#planDock` (plan).
-5. `<script>` — data and geometry, then map layers, then render functions
-   (`renderAll`, `renderMatrix`, `renderCompare`, `renderPlan`), then exports
-   (GPX, CSV, ICS), then boot.
+5. `<script>` — data and geometry, then map layers, then the render functions,
+   then exports (GPX, CSV, ICS), then boot.
+
+## The render chain
+The top-level render is `all()`, not `renderAll`. It calls `sidebar()` and
+`draw()`; `draw()` tail-calls `matrix()`, which tail-calls `compare()`.
+`renderPlan()` is called separately from `all()`, and only when `S.planOpen`.
+So: `all()` → `sidebar()` + `draw()` → `matrix()` → `compare()`, plus
+`renderPlan()`. Anything that changes state ends with `all()`, which also
+`save()`s.
 
 ## Keys and services
 `MT_KEY` (MapTiler) is public by necessity; restrict it by domain in the

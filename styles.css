@@ -1,5 +1,6 @@
 /* Nocturne — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* The font is loaded by the host page's <link>, which is paired with a
+   preconnect and does not block this file's parse. Weights in use are 400/500/600. */
 
 :root {
   --color-bg: #161826;
