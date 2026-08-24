@@ -52,3 +52,50 @@ a server-side proxy first.
 The day bar is a fixed 24-hour scale: x = hour/24. The axis (`.pscale`), the
 day bars, the leg blocks and the tide curve all share that mapping — change one
 and change all four.
+
+## Known issues, deliberately not fixed
+
+These were found in a full review on 2026-08-23 and consciously deferred. Read
+before "discovering" any of them again.
+
+- **The daylight band vanishes for visitors far from Pacific time.** `band()`
+  (in `renderPlan`) takes a from/to pair; when local sunrise and sunset straddle
+  local midnight — which happens when the device clock is many hours off SoCal —
+  `from > to` and it renders nothing, so the whole 24-hour bar reads as night.
+  The fix is to split a wrapped span into two bands. Left alone because the
+  audience is local; it is a rendering bug, not the twilight maths.
+- **Nominatim is called harder than its policy allows.** `anchFetch` issues five
+  sequential queries 120 ms apart (~8 req/s against a documented 1 req/s), with
+  no `email=` parameter and no settable `User-Agent`, so `Referer` is the only
+  identification. Gated behind the Anchorages layer, which is off by default.
+  Raise the sleep to ~1100 ms, persist `anchCache`, or proxy it before the link
+  spreads. A block lands on the whole origin, not one user.
+- **`bottomRefresh` has no debounce and bypasses its own tile budget.** Its
+  second `elevLoad` passes an explicit zoom, so the 999-tile cap is never
+  consulted; zoomed out, one pan can request thousands of PNGs from a
+  public-good S3 bucket. Gated behind the Bottom layer, off by default.
+- **Six destructive actions have no confirmation and no undo** — route delete,
+  location delete, `clear`, the plan's remove-day, and unticking a location
+  (which silently strips it from saved routes). `save()` runs on every `all()`,
+  so nothing is recoverable. Hidden below 720px, but live on desktop.
+- **Every network failure is silent.** Tides, ENC hazards and restricted areas,
+  CDFW protected areas, ATON navaids, Nominatim and the elevation tiles all
+  catch their errors and render nothing. There is no `tileerror` handler and no
+  `<noscript>`.
+- **Navaids draw nothing below zoom 9** with no explanation. There is a dead
+  `.zhint` CSS class that was evidently built for exactly this message.
+- **No `og:image`**, so a shared link previews as a bare text card.
+- **The design system has drift the review catalogued but did not fix**: 15
+  distinct font sizes where 6 would do, two checkbox implementations, two close
+  buttons, four icon-button treatments, and ~45 hard-coded 1–6px paddings
+  running a second spacing scale beside the token ramp.
+
+Settled design decisions, so don't re-litigate them:
+
+- **Night keeps its chart-semantic exceptions.** The compare drawer's green
+  "better" delta, the cool-grey moon limb and the amber daylight band stay as
+  they are, even though the palette is otherwise red-shifted for dark
+  adaptation. Green-means-better reads faster than encoding it by value.
+- **Below 720px the app is a viewer.** Tapping pins and the add-a-point select
+  both work on touch and stay; everything depending on a hover reveal, an HTML5
+  drag, or a sub-20px target is hidden rather than left to fail silently.
