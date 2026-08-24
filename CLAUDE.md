@@ -50,6 +50,18 @@ MapTiler dashboard and override it via `window.SAIL_CONFIG.maptilerKey` in
 `config.js`. Never add a service that needs a *secret* key without introducing
 a server-side proxy first.
 
+## Dock sizing
+Three ceilings, and they must agree or a drag springs back on release:
+`defaultBody()` is how far a dock nobody has touched may grow (a share of the
+stage, so opening one leaves the chart usable). `availBody(self)` is how far a
+*deliberately* sized dock may go — bounded only by `MIN_CHART` and by what the
+other dock is using; if this dock has an explicit size the other yields to its
+minimum. `S.ph` / `S.dh` hold the explicit sizes and being non-null is what marks
+a dock as deliberately sized, so anything that sets a size must set it *before*
+calling `availBody`. Both drag handlers and `fitToContent()` clamp with
+`availBody`, which is the same ceiling `fitPlan` / `fitDrawer` re-apply on
+release.
+
 ## When you change the plan panel
 The day bar is a fixed 24-hour scale: x = hour/24. The axis (`.pscale`), the
 day bars, the leg blocks and the tide curve all share that mapping — change one

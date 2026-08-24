@@ -1182,7 +1182,7 @@
     </div>
 
     <div class="drawer" id="drawer" data-open="false">
-      <div class="drawer-top" id="drawerTop" title="Drag to resize">
+      <div class="drawer-top" id="drawerTop" title="Drag to resize — double-click to fit the content">
         <span class="dttl">Compare routes</span>
         <span class="dsub" id="cmpSub"></span>
         <button class="iconx" data-hide="1" title="Minimize" aria-label="Minimize">–</button>
@@ -1195,7 +1195,7 @@
     </div>
 
     <div class="drawer" id="planDock" data-open="false">
-      <div class="drawer-top" id="planTop" title="Drag to resize">
+      <div class="drawer-top" id="planTop" title="Drag to resize — double-click to fit the content">
         <span class="dttl">Plan by day</span>
         <span class="dsub" id="planSub"></span>
         <span class="proute" id="planRoute"></span>
@@ -3854,14 +3854,48 @@ const planDock=document.getElementById('planDock');
 const planTop=document.getElementById('planTop');
 /* Two docks share what is left under the chart. Open one and it gets the usual
    half; open both and they split it, because the chart is still the point. */
-function dockAvail(){
+/* How tall a dock may get.
+   The chart keeps MIN_CHART; everything above it belongs to the docks. Each dock
+   used to be capped at a *share* of the stage as well — 52% alone, 28% each with
+   both open — and that share is what made dragging one up hit an invisible
+   ceiling and spring back on release: the drag permitted one height, then
+   fitPlan/fitDrawer re-clamped to a smaller one the moment the pointer came up.
+   The share now only decides the DEFAULT height of a dock nobody has dragged.
+   An explicit size wins, bounded by the chart's floor and by whatever the other
+   dock is actually using, so a dock can be pulled up until its content stops
+   scrolling. */
+const MIN_CHART = 72;
+const dockRoom = () =>
+  Math.max(150, document.querySelector('.stage').clientHeight - MIN_CHART);
+
+/* Opening a dock still leaves the chart a usable share — a dock nobody has
+   touched grows to its content but no further than this. Only a deliberate
+   resize (drag, or double-click to fit) is allowed past it, up to availBody. */
+function defaultBody(){
   const stage=document.querySelector('.stage').clientHeight;
   const n=(S.drawer?1:0)+(S.planOpen?1:0);
   if(!n) return 0;
-  /* each open dock also spends a ~40px header, so count those before splitting —
-     otherwise two docks leave the chart a strip */
   const heads=40*n;
   return Math.min((stage-190-heads)/n, (stage-heads)*(n>1? 0.28 : 0.52));
+}
+
+/* The tallest this dock's body may be, with the headers already taken out. */
+function availBody(self){
+  const n=(S.drawer?1:0)+(S.planOpen?1:0);
+  if(!n) return 0;
+  const room=dockRoom();
+  const myHead=(self==='plan'? planTop : drawerTop).offsetHeight;
+  if(n<2) return Math.max(110, room - myHead);
+  const otherHead=(self==='plan'? drawerTop : planTop).offsetHeight;
+  const otherWant=(self==='plan'? S.dh : S.ph);
+  const mySet    =(self==='plan'? S.ph : S.dh);
+  /* Both open. The other dock keeps whatever size it was given; failing that the
+     two split the room evenly — unless THIS one has been deliberately sized, in
+     which case the other yields to its minimum so the drag has somewhere to go.
+     Without that last clause a deliberate drag still stops at half the stage,
+     which is the same complaint one level down. */
+  const otherBody=otherWant || (mySet? 110 : Math.max(110, (room - myHead - otherHead)/2));
+  return Math.max(110, room - myHead - otherHead - otherBody);
 }
 function setPlan(on){
   S.planOpen=!!on;
@@ -3877,8 +3911,8 @@ function fitPlan(){
   if(!S.planOpen){ b.style.maxHeight=''; return; }
   b.style.maxHeight='none';
   const need=document.getElementById('panePlan').scrollHeight + 10;
-  const avail=dockAvail() - planTop.offsetHeight;
-  b.style.maxHeight = Math.max(110, Math.min(S.ph||need, avail)) + 'px';
+  const cap = S.ph!=null? availBody('plan') : Math.min(availBody('plan'), defaultBody());
+  b.style.maxHeight = Math.max(110, Math.min(S.ph||need, cap)) + 'px';
 }
 document.getElementById('planBtn').addEventListener('click', ()=>setPlan(!S.planOpen));
 document.getElementById('clockSeg').querySelectorAll('input').forEach(inp=>{
@@ -3916,13 +3950,32 @@ planTop.addEventListener('pointerdown', e=>{
   const startY=e.clientY, startH=b.clientHeight;
   planTop.setPointerCapture(e.pointerId);
   const move=ev=>{
-    const stage=document.querySelector('.stage').clientHeight;
-    S.ph=Math.max(90, Math.min(startH+(startY-ev.clientY), stage - planTop.offsetHeight - 120));
+    /* same ceiling fitPlan will apply, so releasing never springs back */
+    if(S.ph==null) S.ph=startH;                    // deliberately sized from here on
+    S.ph=Math.max(90, Math.min(startH+(startY-ev.clientY), availBody('plan')));
     b.style.maxHeight=S.ph+'px'; map.invalidateSize({pan:false});
   };
   const up=()=>{ planTop.removeEventListener('pointermove',move); planTop.removeEventListener('pointerup',up); save(); fitPlan(); };
   planTop.addEventListener('pointermove',move);
   planTop.addEventListener('pointerup',up);
+});
+/* Double-click the header to size a dock to exactly what it holds — the whole
+   point of being able to drag it up, in one gesture. If the content is taller
+   than the room available it takes all of it and still scrolls; there is
+   nowhere else for the height to come from. */
+function fitToContent(self){
+  const paneId = self==='plan'? 'panePlan' : 'paneCompare';
+  const need = document.getElementById(paneId).scrollHeight + 10;
+  /* claim the size before measuring, so availBody counts this dock as one the
+     user has deliberately sized and hands back the larger ceiling */
+  if(self==='plan') S.ph=need; else S.dh=need;
+  const h = Math.max(110, Math.min(need, availBody(self)));
+  if(self==='plan') S.ph=h; else S.dh=h;
+  fitPlan(); fitDrawer(); map.invalidateSize({pan:false}); save();
+}
+planTop.addEventListener('dblclick', e=>{
+  if(!S.planOpen || e.target.closest('button, .seg, input, label')) return;
+  fitToContent('plan');
 });
 /* buttons and the two time fields */
 document.getElementById('planBody').addEventListener('click', e=>{
@@ -4093,8 +4146,8 @@ drawerTop.addEventListener('pointerdown', e=>{
   const startY=e.clientY, startH=b.clientHeight;
   drawerTop.setPointerCapture(e.pointerId);
   const move=ev=>{
-    const stage=document.querySelector('.stage').clientHeight;
-    S.dh=Math.max(90, Math.min(startH + (startY-ev.clientY), stage - drawerTop.offsetHeight - 120));
+    if(S.dh==null) S.dh=startH;
+    S.dh=Math.max(90, Math.min(startH + (startY-ev.clientY), availBody('cmp')));
     b.style.maxHeight=S.dh+'px'; map.invalidateSize({pan:false});
   };
   const up=()=>{
@@ -4104,6 +4157,10 @@ drawerTop.addEventListener('pointerdown', e=>{
   };
   drawerTop.addEventListener('pointermove',move);
   drawerTop.addEventListener('pointerup',up);
+});
+drawerTop.addEventListener('dblclick', e=>{
+  if(!S.drawer || e.target.closest('button, .seg, input, label')) return;
+  fitToContent('cmp');
 });
 
 /* ---------------- tick ---------------- */
@@ -4155,9 +4212,8 @@ function fitDrawer(){
   }
   const panes=[document.getElementById('paneCompare')];
   const need=Math.max(60, ...panes.map(p=>p.scrollHeight)) + 10;
-  const top=drawerTop.offsetHeight;
-  const avail=dockAvail() - top;                              // shared with the plan dock
-  b.style.maxHeight = Math.max(110, Math.min(S.dh||need, avail)) + 'px';
+  const cap = S.dh!=null? availBody('cmp') : Math.min(availBody('cmp'), defaultBody());
+  b.style.maxHeight = Math.max(110, Math.min(S.dh||need, cap)) + 'px';
 }
 /* ---------------- plan by day ----------------
    A route says where; the plan says when. Days are the spine: the route's legs
