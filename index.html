@@ -720,6 +720,12 @@
     font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--muted);
   }
   .ptide-e.hi { top:-12px; bottom:auto; color:var(--ac-soft); }
+  /* The chart datum — every height on the row is measured from this line, and
+     all rows share one scale so it sits at the same height on each. Deliberately
+     unlabelled: the datum runs through the middle of the curve's band, so any
+     text on it lands on the line it describes, which is the collision the tide
+     heights were just moved out of. The row's title names the datum instead. */
+  .ptide-datum { stroke:var(--muted-2); stroke-width:1; stroke-dasharray:3 4; opacity:.6; }
   .pmk {
     position:absolute; transform:translateX(-50%); display:flex; align-items:center;
     color:var(--muted); line-height:0; pointer-events:auto;
@@ -4422,6 +4428,26 @@ const MOONDN='<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M10.4 6.2A4.2
 const GRIP='<span class="grip" aria-hidden="true"><svg width="7" height="11" viewBox="0 0 7 11"><g fill="currentColor"><circle cx="1.5" cy="1.5" r="1.1"/><circle cx="5.5" cy="1.5" r="1.1"/><circle cx="1.5" cy="5.5" r="1.1"/><circle cx="5.5" cy="5.5" r="1.1"/><circle cx="1.5" cy="9.5" r="1.1"/><circle cx="5.5" cy="9.5" r="1.1"/></g></svg></span>';
 /* The curve is the day's hourly heights on the same 24-hour scale as the strip
    above it, so a leg and the state of the tide read against each other. */
+/* One vertical scale for every tide row in the plan, and it always contains
+   MLLW. Each day used to be normalised to its own min and max, so the datum sat
+   at a different height on every row and a two-foot range drew exactly like a
+   seven-foot one — the curves were shapes rather than measurements, and no two
+   rows could be compared. Seeding the range with 0 both anchors the datum line
+   and keeps it on screen even on a day that never crosses it. */
+let tideScale=null;
+function tideScaleFor(days){
+  let lo=0, hi=0, any=false;                  // seeded with the datum itself
+  days.forEach(d=>{
+    const ref=d.legs.length? d.legs[0].A : d.start;
+    if(!ref) return;
+    const t=tideGet(ref.lat, ref.lon, d.date);   // already cached by tideBar; no extra fetch
+    if(!t || !t.curve) return;
+    t.curve.forEach(p=>{ if(p.v<lo) lo=p.v; if(p.v>hi) hi=p.v; any=true; });
+  });
+  if(!any) return null;
+  if(hi-lo < 1) hi = lo + 1;                  // a degenerate range must not magnify noise
+  return {lo, hi, span: hi-lo};
+}
 function tideBar(d){
   if(!S.tides) return '';
   const ref=d.legs.length? d.legs[0].A : d.start;
@@ -4429,18 +4455,20 @@ function tideBar(d){
   const t=tideGet(ref.lat, ref.lon, d.date);
   if(t===undefined) return '<div class="ptide ptide-wait">Tide predictions…</div>';
   if(!t) return '';
-  const lo=Math.min(...t.curve.map(p=>p.v)), hi=Math.max(...t.curve.map(p=>p.v));
-  const span=Math.max(0.4, hi-lo);
   /* Percent of the row held back at top and bottom. Without it the peaks and
      troughs sit exactly on the row's edges, which is where the high and low
      labels have to go — so every height printed over the line it marks. */
   const TIDE_PAD=10;
+  const sc = tideScale || (()=>{ const v=t.curve.map(p=>p.v);
+    const lo=Math.min(0,...v), hi=Math.max(0,...v);
+    return {lo, hi, span:Math.max(1,hi-lo)}; })();
+  const yOf = v => TIDE_PAD + (100-2*TIDE_PAD)*(1-(v-sc.lo)/sc.span);
   const pt=p=>{
     const [H,M]=p.t.split(':').map(Number);
-    const y=TIDE_PAD + (100-2*TIDE_PAD)*(1-(p.v-lo)/span);
-    return ((H+M/60)/24*100).toFixed(2)+','+y.toFixed(2);
+    return ((H+M/60)/24*100).toFixed(2)+','+yOf(p.v).toFixed(2);
   };
   const line=t.curve.map(pt).join(' ');
+  const y0=yOf(0);
   const marks=t.events.map(e=>{
     const [H,M]=e.t.split(':').map(Number);
     const x=(H+M/60)/24*100;
@@ -4448,6 +4476,7 @@ function tideBar(d){
   }).join('');
   return `<div class="ptide" title="${t.st.n} \u00b7 ${Math.round(t.away)} nm away \u00b7 heights in feet above MLLW">
       <svg class="ptide-c" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <line class="ptide-datum" x1="0" y1="${y0.toFixed(2)}" x2="100" y2="${y0.toFixed(2)}" vector-effect="non-scaling-stroke"></line>
         <polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2.4" vector-effect="non-scaling-stroke"></polyline>
       </svg>${marks}
     </div>`;
@@ -4477,6 +4506,7 @@ function renderPlan(){
       }).join('') + '</div>';
   const band = (a,b,cls) => (a&&b)? `<div class="${cls}" style="left:${hPct(a)}%;width:${Math.max(0,hPct(b)-hPct(a))}%"></div>` : '';
   const mk = (t,cls,icon,label) => t? `<span class="pmk ${cls}" style="left:${hPct(t)}%" title="${label} ${HHMM(t)}">${icon}</span>` : '';
+  tideScale = tideScaleFor(days);
   const html = days.map(d=>{
     const bar = '<div class="pbarw"><div class="pbar">'
       + band(d.twi&&d.twi.rise, d.sun&&d.sun.rise, 'pbar-twi')
