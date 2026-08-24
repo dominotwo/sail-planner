@@ -3,7 +3,9 @@
 ## What this is
 A single-file browser app: `index.html` holds the markup, one `<style>` block
 and one `<script>`. `styles.css` carries design tokens only. No build step, no
-package manager, no framework. Leaflet 1.9.4 loads from unpkg with an SRI hash.
+package manager, no framework. Leaflet 1.9.4 and Inter are **vendored** under
+`vendor/` — every render-critical asset is same-origin, so the page boots with no
+internet at all. See `vendor/README.md` before touching either.
 
 ## Ground rules
 - **Keep it a static site.** No server, no bundler, no npm dependencies unless

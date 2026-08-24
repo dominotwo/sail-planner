@@ -10,13 +10,20 @@
 <meta property="og:title" content="Sail Planner — Southern California Bight">
 <meta property="og:description" content="Distances, sail time, weather windows and a day-by-day plan for the Channel Islands. Planning only — not for navigation.">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Leaflet and Inter are vendored under vendor/ (provenance and refresh steps in
+     vendor/README.md). Everything needed to render is same-origin, so there is no
+     CDN on the critical path: three render-blocking cross-origin requests become
+     two same-origin ones, the page works with no internet at all, and no visitor
+     IP reaches Google. Subresource integrity is intentionally absent — it guards
+     against a CDN serving something else, which cannot happen for a file we ship.
+     leaflet.js and leaflet.css were verified byte-exact against upstream's
+     published SHA-384 hashes when vendored. -->
+<link rel="preload" href="vendor/inter/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="vendor/inter/inter.css">
 <link rel="stylesheet" href="styles.css">
 <script src="config.js" onerror="void 0"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<script src="vendor/leaflet/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; }

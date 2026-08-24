@@ -9,13 +9,14 @@ with sun, moon and tide.
 
 ## What this repo is
 
-Three files. No build step, no framework, no server.
+No build step, no framework, no server, and no runtime dependency on a CDN.
 
 | File | What it is |
 | --- | --- |
 | `index.html` | The whole app — markup, CSS and JS in one file (~240 KB) |
 | `styles.css` | Design tokens (the Nocturne palette, type and spacing scales) |
 | `config.js` | Optional overrides, e.g. your own MapTiler key |
+| `vendor/` | Leaflet 1.9.4 and the Inter woff2 subsets, committed rather than fetched from a CDN — see `vendor/README.md` |
 
 Everything else is fetched at runtime from public services (see *Data sources*).
 
@@ -105,9 +106,11 @@ dashboard, then add the same domain to the MapTiler allow-list below.
    built-in set of anchorages; nobody can see anyone else's work, and there is
    currently no way to share a plan by URL — plans travel as GPX, CSV or ICS
    downloads.
-5. **No analytics, no cookies, no accounts.** Google Fonts is the only
-   third-party asset that sees your visitors' IPs; self-host Inter if that
-   matters for your audience.
+5. **No analytics, no cookies, no accounts, and no third-party asset on the
+   critical path.** Leaflet and Inter are vendored under `vendor/`, so nothing
+   a visitor needs to see the page is fetched from anyone else and no visitor
+   IP reaches Google. The map tiles and marine data are still fetched from the
+   services in *Data sources* below, at the moment a layer is switched on.
 
 ## Data sources
 
