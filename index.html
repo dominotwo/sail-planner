@@ -246,10 +246,6 @@
   .cmpx::after { content:""; position:absolute; inset:-14px; }
   th.rtsel:hover .cmpx, .cmpx:focus-visible { opacity:1; }
   .cmpx:hover { color:var(--danger); border-color:var(--ac-line); }
-  @media (hover:none), (max-width:760px){
-    .cmpx { width:26px; height:26px; opacity:1; font-size:14px; }
-    .cmpx::after { inset:-9px; }
-  }
   /* ≥4 routes: one column per route, distance · time stacked under the name */
   .cmp.nar td.nr { line-height:1.35; }
   .cmp.nar .nrn {
@@ -287,53 +283,9 @@
   .loc { position:relative; }
 
   /* small screens: the chart keeps the space, controls stay reachable */
-  @media (max-width:760px){
-    .ctrls { right:var(--space-4); top:var(--space-4); width:min(224px, calc(100% - 72px)); }
-    .float { left:8px; max-width:calc(100% - 16px); }
-    .drawer-top { padding-left:var(--space-4); padding-right:var(--space-4); }
-  }
   /* phones and small tablets: the chart is full width and the sidebar becomes an
      overlay off the rail, so nothing permanently eats the water */
-  @media (max-width:720px){
-    .app, .app[data-collapsed="true"], .app[data-collapsed="false"] { grid-template-columns:42px 1fr; }
-    .rail { display:flex; }
-    .side {
-      position:fixed; left:42px; top:0; bottom:0; width:min(324px, calc(100vw - 52px));
-      z-index:1300; box-shadow:var(--shadow-lg); border-right:1px solid var(--line);
-    }
-    .app[data-collapsed="true"] .side { display:none; }
-    .app[data-collapsed="true"][data-peek] .side { width:min(324px, calc(100vw - 52px)); }
-    .float { left:48px; max-width:calc(100vw - 58px); }
-    .drawer-b { max-height:52vh; }
-    .ctrls { right:var(--space-3); top:var(--space-3); }
-    .rbtn { min-width:32px; min-height:32px; }
-    /* on a phone three route columns can't fit legibly — swiping the table
-       sideways beats clipping the numbers, so names get their width back */
-    .pane.tight .cmp td.wp, .pane.tighter .cmp td.wp,
-    .pane.tight .cmp th.rtsel, .pane.tighter .cmp th.rtsel { max-width:118px; }
-    .pane { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-
-    /* Below this width the app is a viewer. Building a route by tapping pins
-       and by the add-a-point select both work on touch, so they stay; every
-       control that depends on a hover reveal, an HTML5 drag the browser never
-       fires on touch, or a sub-20px target is hidden rather than left to fail
-       silently. Nothing here is destructive-by-accident either — clear, reverse
-       and the deletes all go with it. */
-    .loc-act, .rt-act, .rdel, .pday-act,
-    .loc-coords, .pstep,
-    #addBtn, #hint, #newRoute, #revRoute, #clearRoute,
-    .grip, .pnote, .no-touch { display:none !important; }
-    /* the stop and day rows stop advertising a grab they can't honour */
-    .rleg, .pleg { cursor:default; }
-    .pbar-leg { cursor:default; }
-    /* departure times stay legible but inert — the plan reads, it doesn't edit */
-    .ptime { pointer-events:none; }
-  }
   /* touch: row actions can't wait for a hover */
-  @media (hover:none){
-    .loc-act { opacity:1; position:static; transform:none; padding-left:0; background:none; }
-    .loc { gap:var(--space-2); }
-  }
   .loc-act { opacity:0; display:flex; gap:2px; position:absolute; right:var(--space-3); top:50%; transform:translateY(-50%);
     padding-left:var(--space-6); background:linear-gradient(90deg, transparent, var(--row-h) 18%); }
   .loc:hover .loc-act, .loc:focus-within .loc-act { opacity:1; }
@@ -871,6 +823,112 @@
   .mx-note { color:var(--muted-2); font-size:11px; margin: var(--space-3) 0 var(--space-4); width:0; min-width:100%; }
   .mx-key { display:none; flex-wrap:wrap; gap:var(--space-3) var(--space-6); margin-top:var(--space-4); font-size:11px; color:var(--muted); }
   .mx-key span.k { display:flex; align-items:center; gap:var(--space-2); }
+
+  /* ---------------- responsive overrides ----------------
+     These live at the end on purpose. A media query adds no specificity,
+     so an override here only wins if it comes after the rule it is
+     overriding. Sitting mid-sheet, most of this block was dead: .float,
+     .drawer-b, .pleg, .ptime and .pbar-leg are all defined further down,
+     so their phone rules never applied. Keep responsive rules last. */
+  @media (hover:none), (max-width:760px){
+    .cmpx { width:26px; height:26px; opacity:1; font-size:14px; }
+    .cmpx::after { inset:-9px; }
+  }
+  @media (max-width:760px){
+    .ctrls { right:var(--space-4); top:var(--space-4); width:min(224px, calc(100% - 72px)); }
+    .float { left:8px; max-width:calc(100% - 16px); }
+    .drawer-top { padding-left:var(--space-4); padding-right:var(--space-4); }
+  }
+  @media (max-width:720px){
+    .app, .app[data-collapsed="true"], .app[data-collapsed="false"] { grid-template-columns:42px 1fr; }
+    .rail { display:flex; }
+    .side {
+      position:fixed; left:42px; top:0; bottom:0; width:min(324px, calc(100vw - 52px));
+      z-index:1300; box-shadow:var(--shadow-lg); border-right:1px solid var(--line);
+    }
+    .app[data-collapsed="true"] .side { display:none; }
+    .app[data-collapsed="true"][data-peek] .side { width:min(324px, calc(100vw - 52px)); }
+    .float { left:48px; max-width:calc(100vw - 58px); }
+    .drawer-b { max-height:52vh; }
+    .ctrls { right:var(--space-3); top:var(--space-3); }
+    .rbtn { min-width:32px; min-height:32px; }
+    /* on a phone three route columns can't fit legibly — swiping the table
+       sideways beats clipping the numbers, so names get their width back */
+    .pane.tight .cmp td.wp, .pane.tighter .cmp td.wp,
+    .pane.tight .cmp th.rtsel, .pane.tighter .cmp th.rtsel { max-width:118px; }
+    .pane { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+    /* Below this width the app is a viewer. Building a route by tapping pins
+       and by the add-a-point select both work on touch, so they stay; every
+       control that depends on a hover reveal, an HTML5 drag the browser never
+       fires on touch, or a sub-20px target is hidden rather than left to fail
+       silently. Nothing here is destructive-by-accident either — clear, reverse
+       and the deletes all go with it. */
+    .loc-act, .rt-act, .rdel, .pday-act,
+    .loc-coords, .pstep,
+    #addBtn, #hint, #newRoute, #revRoute, #clearRoute,
+    .grip, .pnote, .no-touch { display:none !important; }
+
+    /* Hiding a grid child does not leave a hole — it removes the item, and every
+       later sibling slides one column to the left. .rleg loses .grip and .rdel,
+       .pleg loses .grip, so both need a template matching what is actually left
+       or the name lands in a 9-18px track: measured 13 lines of wrap and a 259px
+       row before this. Hide a grid child here and you must edit its template
+       too. .rt and .loc are safe — .rt's hidden child is its last, and .loc is
+       flex, not grid. */
+    .rleg { grid-template-columns:18px 1fr auto; }          /* pin, name, value */
+
+    /* The plan's five columns do not fit a phone. Squeezed into ~390px the name
+       truncated to "Emerald Ba..." and the departure field rendered as a bare
+       "0". A leg is two lines here instead: the name on its own, then the times
+       under it. The column header is meaningless once the columns are gone. */
+    .pcols { display:none; }
+    .pleg {
+      display:flex; flex-wrap:wrap; align-items:center;
+      gap:var(--space-1) var(--space-3); padding:var(--space-2) 0;
+    }
+    .pleg-nm { flex:1 0 100%; white-space:normal; }
+    /* the same shift again: .pdep is [- input +] and loses both steps, so the
+       input landed in the 16px track and clipped at 34px against 52px of content */
+    .pleg .pdep { flex:0 0 auto; grid-template-columns:1fr; }
+    .pleg .ptime { width:56px; min-width:0; text-align:center; }
+    /* Without the column header the three times read as three unlabelled
+       numbers. An arrow and a separator carry what "Depart / Arrive / Under way"
+       used to: 08:00 -> 18:48 . 10:49. */
+    .pleg .pleg-arr::before { content:"\2192\00a0"; color:var(--muted-2); }
+    .pleg .pleg-h::before   { content:"\00b7\00a0"; color:var(--muted-2); }
+    .pleg-h { margin-left:auto; }
+    /* Six non-shrinking children in a nowrap flex row: the title collapsed to
+       three lines and the route name to "Isla...". Let it wrap, and drop the
+       subtitle — its numbers are all repeated in the rows below. */
+    /* Start / Days start / Tides is a nowrap row of fixed-width fields totalling
+       ~355px; it overflowed a 299px pane rather than wrapping. */
+    .phead { flex-wrap:wrap; row-gap:var(--space-2); }
+    /* the date plus sun and moon times do not fit one line at 360px */
+    .pday-h { flex-wrap:wrap; row-gap:var(--space-1); }
+    .drawer-top { flex-wrap:wrap; row-gap:var(--space-2); }
+    .drawer-top .dsub { display:none; }
+    .drawer-top .dttl { flex:0 0 auto; }
+    .drawer-top .proute { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* the stop and day rows stop advertising a grab they can't honour */
+    .rleg, .pleg { cursor:default; }
+    .pbar-leg { cursor:default; }
+    /* departure times stay legible but inert — the plan reads, it doesn't edit */
+    .ptime { pointer-events:none; }
+  }
+  @media (hover:none){
+    .loc-act { opacity:1; position:static; transform:none; padding-left:0; background:none; }
+    .loc { gap:var(--space-2); }
+    /* Controls that stay on touch are 12-16px tall, well under a finger. Grow the
+       hit area with a pseudo-element rather than the box, so nothing moves and no
+       layout is re-measured. Horizontal growth is kept to less than half the
+       neighbouring gap so adjacent buttons cannot steal each other's taps. */
+    .btn.mini, .loc-chk, .rt-eye { position:relative; }
+    .btn.mini::after  { content:""; position:absolute; inset:-5px -2px; }
+    .loc-chk::after   { content:""; position:absolute; inset:-5px; }   /* 16px box -> 26px target */
+    .rt-eye::after    { content:""; position:absolute; inset:-6px -4px; }
+  }
 </style>
 </head>
 <body>
