@@ -81,7 +81,7 @@
     --shadow-lg: 0 0 0 1px var(--color-neutral-300), 0 16px 40px rgba(31,35,58,.16);
     --tile: url(#tileDay);
     --sea:#c9dcea;
-    --tile-depth: none;
+    --tile-depth: brightness(1);   /* a no-op, not `none`: it gets composed with url(#keyLand) below, and `filter: url(#x) none` is invalid */
     --tile-lines: grayscale(.25) saturate(1.6) contrast(2) brightness(.5);
     --ctl-bg:var(--color-neutral-200); --ctl-bg-h:var(--color-neutral-300); --row-h:var(--color-neutral-200);
   }
@@ -465,6 +465,12 @@
   /* the depth layers sit outside the filtered tile pane so charted contours and
      seamark symbols keep their own nautical colors */
   .leaflet-depth-pane { filter: var(--tile-depth, none); }
+  /* Land=Sat cannot key its own water out, so the sea layer is lifted above it
+     (see stackSea) and keyed the other way instead: its land goes, the imagery
+     underneath shows through, and Sea stays independent of Land. */
+  :root[data-base="sat"][data-depth="contour"] .leaflet-depth-pane {
+    filter: url(#keyLand) var(--tile-depth, brightness(1));
+  }
   .leaflet-lines-pane { filter: var(--tile-lines, none); }
   /* the isobaths are hairlines in the source tiles — a second offset copy of the
      same layer thickens them enough to read against the relief */
@@ -867,6 +873,16 @@
   <!-- Streets keeps its own drawing, so water is keyed by BLUENESS instead of
        luminance: only the blue-dominant pixels drop out, and grey roads, labels
        and parks survive. Chains ahead of the palette recolour. -->
+  <!-- Removes the relief chart's LAND, so it can be laid over satellite imagery
+       and still leave the photographed land showing. keyBlue's ±4 is far too
+       shallow here: on this layer land is a warm near-white (R−B ≈ +6/255) while
+       even the palest shallow water stays cool (B−R ≈ +13/255), so the two sit
+       only 19/255 apart. A ×20 coefficient with the crossover at B−R ≈ +0.012
+       splits them, and the ~13/255-wide transition band antialiases the coast
+       instead of stepping it. Measured against real tiles, not assumed. -->
+  <filter id="keyLand" color-interpolation-filters="sRGB">
+    <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -20 0 20 0 0.26"></feColorMatrix>
+  </filter>
   <filter id="keyBlue" color-interpolation-filters="sRGB">
     <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  4 0 -4 0 1"></feColorMatrix>
     <feComponentTransfer><feFuncA type="discrete" tableValues="0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1"></feFuncA></feComponentTransfer>
@@ -1095,7 +1111,7 @@
             <div class="seg" id="baseSeg">
               <label class="seg-opt" title="A plain street map on land — roads and place names"><input type="radio" name="base" value="streets" checked>Base</label>
               <label class="seg-opt" title="Land relief — hillshading and elevation contours"><input type="radio" name="base" value="topo">Topo</label>
-              <label class="seg-opt" title="Plain aerial imagery, land and sea together"><input type="radio" name="base" value="sat">Sat</label>
+              <label class="seg-opt" title="Aerial imagery on land — the Sea setting still governs the water"><input type="radio" name="base" value="sat">Sat</label>
             </div>
           </div>
           <div class="ctrl-row">
@@ -1839,20 +1855,35 @@ const BASES={
   topo:   {url:'https://api.maptiler.com/maps/topo-v2/256/{z}/{x}/{y}.png?key='+MT_KEY,
            attribution:'© MapTiler © OpenStreetMap contributors', maxZoom:18, maxNativeZoom:18},
   /* Imagery is the one base that is NOT keyed: photographed water is nothing
-     like the flat blue the key looks for, so it is drawn plain — land and sea
-     together, which is what a plain satellite view means. */
+     like the flat blue the key looks for. With Sea off or Sea=Sat that is
+     exactly right — plain imagery, land and sea together. With Sea=Relief the
+     sea layer is lifted over it instead and keyed the other way, so the Sea
+     setting still holds. See stackSea and #keyLand. */
   sat:    {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
            attribution:'Imagery: Esri, Maxar, Earthstar Geographics', maxZoom:19, maxNativeZoom:18}
 };
 let baseLayer=null;
+/* Where the sea sits relative to the land.
+   streets and topo key their own water out, so the sea can sit *under* them and
+   show through the holes. Imagery cannot be keyed — photographed water is
+   nothing like a flat map blue — so under Land=Sat the base painted over the sea
+   and whatever Sea was set to was silently ignored. The relief chart's land IS
+   keyable (see #keyLand), so for that one combination the sea is lifted above
+   the imagery and has its land removed instead.
+   205 clears the base tiles (pane 200) while staying below zones (249), the
+   isobaths, navaids, route lines and pins — lifting it to the pane's original
+   250 would bury the traffic-lane polygons. */
+function stackSea(){
+  const over = S.base==='sat' && S.depth==='contour';
+  map.getPane('depth').style.zIndex = over? 205 : 190;
+}
 function setBase(){
   const b=BASES[S.base] || BASES.streets;
   document.documentElement.dataset.base=S.base||'streets';
   if(baseLayer) map.removeLayer(baseLayer);
   baseLayer=L.tileLayer(b.url,{attribution:b.attribution, maxZoom:b.maxZoom,
     maxNativeZoom:b.maxNativeZoom, detectRetina:false, zIndex:1}).addTo(map);
-  /* every land option keys its water out, so Depth and Land never interfere */
-  map.getPane('depth').style.zIndex = 190;
+  stackSea();
 }const legLayer = L.layerGroup().addTo(map);
 /* Every leg's drawn geometry, kept so the cross-highlight can trace the leg
    itself on the chart rather than only marking its two ends. */
@@ -2578,6 +2609,8 @@ map.getPane('marks').style.zIndex=252;
 map.getPane('marks').classList.add('leaflet-mark-pane');
 function setDepth(){
   if(depthLayer){ map.removeLayer(depthLayer); depthLayer=null; }
+  document.documentElement.dataset.depth = S.depth||'off';
+  stackSea();
   const d=DEPTH[S.depth];
   if(d){
     depthLayer = L.tileLayer(d.url,{attribution:d.attribution, maxZoom:d.maxZoom, maxNativeZoom:d.maxNativeZoom, opacity:d.op, className:'depth-tiles', pane:'depth'});
