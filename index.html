@@ -482,6 +482,11 @@
   .chks { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--space-2) var(--space-4); }
   .chk { display:flex; align-items:center; gap:var(--space-3); font-size:11.5px; color:var(--muted); cursor:pointer; padding:3px 0; min-height:22px; }
   .chk:hover { color:var(--ac-soft); }
+  /* a layer that is fetching: the label says so instead of the tick looking inert */
+  .chk.busy { color:var(--ac-soft); }
+  .chk.busy::after { content:"…"; margin-left:auto; opacity:.75; animation:chkPulse 1.1s ease-in-out infinite; }
+  @keyframes chkPulse { 0%,100%{ opacity:.28 } 50%{ opacity:.9 } }
+  @media (prefers-reduced-motion:reduce){ .chk.busy::after { animation:none; opacity:.75 } }
   .chk input {
     appearance:none; -webkit-appearance:none; width:15px; height:15px; margin:0; flex:0 0 auto;
     border:1px solid var(--muted-2); border-radius:3px; background:transparent;
@@ -3125,6 +3130,7 @@ function elevSync(lat,lon,zTop){
    of the coarse value. Judged by disagreement rather than by a depth limit, this
    holds anywhere on earth, not just in this bight. */
 const Z_REF=11;
+const REF_BUDGET=160;      // tiles the coarse reference may span; see bottomRefresh
 /* The reference walks down from zoom 11 the way the plain sampler does: out in
    deep water these tiles carry an exact 0 for no-data, and only the coarsest
    levels hold real soundings. */
@@ -3196,18 +3202,33 @@ async function landLoad(lat,lon){
   }
   return Promise.all(jobs.map(([z,x,y])=>elevTile(z,x,y)));
 }
-let botOverlay=null, botGrid=null, botBusy=false;
+let botOverlay=null, botGrid=null, botBusy=false, botAgain=false;
+/* Bottom was the one layer calling straight into moveend with no debounce, and
+   it is by far the most expensive of them. 450ms, same as hazards and
+   restricted areas. */
+let botTimer=null;
+const botDebounce = () => { clearTimeout(botTimer); botTimer=setTimeout(bottomRefresh,450); };
 async function bottomRefresh(){
   if(!S.lyrBot){
     if(botOverlay){ map.removeLayer(botOverlay); botOverlay=null; botGrid=null; }
     return;
   }
-  if(botBusy) return;
-  botBusy=true;
+  /* A pan mid-load used to be dropped on the floor, leaving the overlay drawn
+     for the previous view. Remember it instead and re-run once. */
+  if(botBusy){ botAgain=true; return; }
+  botBusy=true; botBusyUI(true);
   try{
     const b=map.getBounds();
     await elevLoad(b,0,80);
-    await elevLoad(b,0.05,999,Z_REF);      // the clean coarse reference
+    /* The clean coarse reference. It used to be pinned to Z_REF with a 999
+       budget, but passing an explicit zoom skips zoomFor entirely, so the budget
+       was never consulted and the count grew 4x per zoom-out step: 99 tiles at
+       z10, 357 at z9, 1209 at z8, 4697 at z7 — every one a fetch, a canvas
+       decode and a retained Float32Array. Capping it at Z_REF keeps the finest
+       case identical while letting a wide view drop to a coarser reference,
+       which elevRef already handles: it walks 11 down to Z_MIN and takes the
+       first level with data, so a coarser reference is not a worse one. */
+    await elevLoad(b,0.05,REF_BUDGET, Math.min(Z_REF, zoomFor(b, REF_BUDGET)));
     const sz=map.getSize();
     const W=Math.max(60,Math.min(300,Math.round(sz.x/3.2))), H=Math.max(48,Math.min(240,Math.round(sz.y/3.2)));
     const n=b.getNorth(), s=b.getSouth(), w=b.getWest(), e=b.getEast();
@@ -3239,7 +3260,16 @@ async function bottomRefresh(){
     botGrid={W,H,n,s,w,e,dep,cls};
     if(botOverlay) map.removeLayer(botOverlay);
     botOverlay=L.imageOverlay(cv.toDataURL(), b, {pane:'zones', opacity:1, interactive:false}).addTo(map);
-  } finally { botBusy=false; }
+  } finally {
+    botBusy=false; botBusyUI(false);
+    if(botAgain){ botAgain=false; bottomRefresh(); }
+  }
+}
+/* Ticking Bottom is seconds of work before anything appears. Say so, rather
+   than leaving the checkbox looking like it did nothing. */
+function botBusyUI(on){
+  const el=document.getElementById('botChk');
+  if(el && el.parentElement) el.parentElement.classList.toggle('busy', !!on);
 }
 function seabedAt(lat,lon){
   if(!botGrid) return null;
@@ -3547,7 +3577,7 @@ if(S.lyrAnch) anchRefresh();
 if(S.lyrHaz) hazRefresh();
 if(S.lyrRest) rstRefresh();
 if(S.lyrBot) bottomRefresh();
-map.on('moveend zoomend', ()=>{ if(S.lyrBot) bottomRefresh(); if(S.lyrAnch) anchDebounce(); if(S.lyrHaz) hazDebounce(); if(S.lyrRest) rstDebounce(); });
+map.on('moveend zoomend', ()=>{ if(S.lyrBot) botDebounce(); if(S.lyrAnch) anchDebounce(); if(S.lyrHaz) hazDebounce(); if(S.lyrRest) rstDebounce(); });
 /* the seabed layer is a raster, so its readout rides the cursor */
 map.on('mousemove', ev=>{
   const el=document.getElementById('botRead');
