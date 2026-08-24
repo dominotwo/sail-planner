@@ -190,11 +190,13 @@
   .loc-chk svg { width:10px; height:10px; opacity:0; }
   .loc-chk[aria-checked="true"] svg { opacity:1; }
   .loc-chk svg path { stroke:var(--ac); }
+  /* a pill, not a disc: codes run one to four characters ("A" to "SBI") and a
+     fixed circle would clip everything past the first */
   .pin-no {
-    width:18px; height:18px; flex:none; border-radius:50%; font-size:10px;
+    min-width:18px; height:18px; flex:none; padding:0 4px; border-radius:9px;
+    font-size:10px; font-weight:600; letter-spacing:.02em;
     display:grid; place-items:center; color:var(--pin-fg);
     background:var(--pin-bg); border:1px solid var(--ac-line);
-    font-variant-numeric:tabular-nums;
   }
   .loc.off .pin-no { background:transparent; border-color:var(--line); color:var(--muted-2); }
   .loc-name { flex:1; cursor:pointer; font-size:12.5px; min-width:0; }
@@ -536,20 +538,21 @@
 
   .pin { position:relative; }
   .pin-dot {
-    width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
-    font-size:11px; font-family:var(--font-heading); font-variant-numeric:tabular-nums;
+    min-width:22px; height:22px; padding:0 5px; border-radius:11px;
+    display:grid; place-items:center;
+    font-size:11px; font-family:var(--font-heading); font-weight:600; letter-spacing:.02em;
     color:var(--pin-fg); background:var(--pin-bg); border:1.5px solid var(--ac); cursor:pointer;
     box-shadow:0 0 0 4px var(--ac-fill);
   }
   .pin-dot.in-route { background:var(--pin-bg-on); color:var(--pin-fg-on); }
   .pin-lbl {
-    position:absolute; left:26px; top:2px; white-space:nowrap; font-size:11px;
+    position:absolute; left:calc(100% + 4px); top:2px; white-space:nowrap; font-size:11px;
     color:var(--color-text); text-shadow:0 1px 4px var(--halo), 0 0 8px var(--halo), 0 0 12px var(--halo);
     pointer-events:none;
   }
   .pin.no-name .pin-lbl { display:none; }
   .pin-seq {
-    position:absolute; left:17px; top:-9px; min-width:15px; height:14px; padding:0 3px;
+    position:absolute; left:calc(100% - 5px); top:-9px; min-width:15px; height:14px; padding:0 3px;
     border-radius:3px; background:var(--ac); color:var(--pin-fg-on);
     font-size:9.5px; font-weight:600; letter-spacing:.02em;
     display:grid; place-items:center; box-shadow:0 0 0 1.5px var(--color-bg);
@@ -1910,6 +1913,32 @@ function legs(){
 }
 /* A point a given fraction along the drawn geometry, with the course it is
    making there — enough to lay a chevron on the leg pointing the way you sail. */
+/* Locations are labelled by their initials, not a serial number. A number
+   beside a pin reads as "first stop", which is what the sequence badge actually
+   means — two numbering schemes on one marker is the confusion. Avalon -> A,
+   Newport Harbor -> NH, Santa Barbara Island -> SBI. Route order stays numeric,
+   in .pin-seq on the chart and in the route list.
+   Collisions are resolved by lengthening the first word before falling back to
+   a digit, so a code stays derived from the name wherever it can. */
+const initialsOf = name => {
+  const w=String(name||'').match(/[A-Za-z0-9]+/g);
+  return w && w.length? w.map(x=>x[0]).join('').toUpperCase().slice(0,4) : '?';
+};
+let locCode=new Map();
+function refreshCodes(){
+  const used=new Set(); locCode=new Map();
+  S.locs.forEach(l=>{
+    const w=String(l.name||'').match(/[A-Za-z0-9]+/g) || ['?'];
+    const rest=w.slice(1).map(x=>x[0]).join('');
+    let code=initialsOf(l.name);
+    for(let k=2; used.has(code) && k<=w[0].length; k++)
+      code=(w[0].slice(0,k)+rest).toUpperCase().slice(0,4);
+    for(let n=2; used.has(code); n++) code=initialsOf(l.name)+n;
+    used.add(code); locCode.set(l.id, code);
+  });
+}
+const codeOf = l => (l && locCode.get(l.id)) || initialsOf(l && l.name);
+
 function arrowAt(geo, frac, col){
   if(!geo || geo.length<2) return;
   let total=0; const segs=[];
@@ -1931,6 +1960,7 @@ function arrowAt(geo, frac, col){
   })}));
 }
 function draw(){
+  refreshCodes();
   legLayer.clearLayers(); lblLayer.clearLayers(); pinLayer.clearLayers();
   legPaths.length=0; if(hlLayer){ hlLayer.clearLayers(); }
   const L2 = legs();
@@ -2046,7 +2076,7 @@ function draw(){
     const seq = seqs.length? `<div class="pin-seq">${seqs.join(',')}</div>` : '';
     const n = seqs.length? 1 : -1;
     const mk = L.marker([l.lat,l.lon],{ zIndexOffset: n>=0? 1000:0, draggable: l.id===coords, autoPan:true, icon:L.divIcon({ className:'', iconSize:null,
-      html:`<div class="pin ${nameOk[act.indexOf(l)]?'':'no-name'} ${l.id===coords?'moving':''}" data-loc="${l.id}"><div class="pin-dot ${n>=0?'in-route':''}" data-id="${l.id}" title="${l.name} — click to add to route">${i+1}</div>${seq}<div class="pin-lbl">${l.name}</div></div>`
+      html:`<div class="pin ${nameOk[act.indexOf(l)]?'':'no-name'} ${l.id===coords?'moving':''}" data-loc="${l.id}"><div class="pin-dot ${n>=0?'in-route':''}" data-id="${l.id}" title="${l.name} — click to add to route">${codeOf(l)}</div>${seq}<div class="pin-lbl">${l.name}</div></div>`
     })});
     if(l.id===coords) mk.on('dragend', ev=>{
       const p=ev.target.getLatLng();
@@ -2095,7 +2125,7 @@ function tip(l, users){
 
 function matrix(L2){
   const a=active(), M=S.mxMode;
-  const no = l => S.locs.indexOf(l)+1;
+  const no = l => codeOf(l);
   const vals=[];
   a.forEach((A,i)=>a.forEach((B,j)=>{ if(i===j) return;
     const l=L2.find(x=>(x.A===A&&x.B===B)||(x.A===B&&x.B===A)); if(!l) return;
@@ -2230,13 +2260,14 @@ function compare(){
 /* ---------------- sidebar ---------------- */
 let editing=null, coords=null, rEditing=null;
 function sidebar(){
+  refreshCodes();
   const list=document.getElementById('locList');
   list.innerHTML = S.locs.map((l,i)=>`
     <div class="loc ${l.on?'':'off'}" data-id="${l.id}" data-loc="${l.id}">
       <button class="loc-chk" aria-checked="${l.on}" data-act="toggle" aria-label="Show ${l.name}">
         <svg viewBox="0 0 10 10"><path d="M1 5 L4 8 L9 2" stroke="var(--color-accent-200)" stroke-width="1.8" fill="none"/></svg>
       </button>
-      <span class="pin-no">${i+1}</span>
+      <span class="pin-no">${codeOf(l)}</span>
       <span class="loc-name" data-act="fly">${l.id===editing? `<input class="input loc-edit" value="${l.name}" data-id="${l.id}" aria-label="Name this location">` : l.name}</span>
       <span class="loc-act">
         <button class="btn btn-ghost mini" data-act="route">+ route</button>
@@ -2353,7 +2384,17 @@ document.getElementById('map').addEventListener('click', e=>{
   const d=e.target.closest('.pin-dot'); if(!d) return;
   addStop(d.dataset.id); all();
 });
-document.getElementById('clearRoute').addEventListener('click', ()=>{ S.route=[]; all(); });
+document.getElementById('clearRoute').addEventListener('click', ()=>{
+  S.route=[];
+  /* The plan belongs to the route and is indexed by leg number, so an emptied
+     route leaves days and departure times describing legs that no longer exist.
+     planFor kept those day slots — it only empties them — so the next leg added
+     was appended *after* them and landed on day five of a cleared four-day plan.
+     The start date is the one thing worth keeping. */
+  const p=S.plans[S.activeRoute];
+  if(p){ p.days=[]; p.dep={}; }
+  all();
+});
 document.getElementById('revRoute').addEventListener('click', ()=>{ S.route.reverse(); all(); });
 
 /* add pin */
@@ -4323,6 +4364,10 @@ function planFor(id){
   /* reconcile with the route as it stands now: drop legs that no longer exist,
      append the new ones as days of their own, and leave the user's grouping and
      any layover days they inserted alone */
+  /* No legs means no days. Without this, any path that empties a route — clear,
+     deleting the locations, unticking them — leaves a row of blank days that the
+     next leg gets appended behind. */
+  if(!nLegs) p.days=[];
   const seen=new Set();
   p.days=(p.days||[]).map(day=>day.filter(i=>{
     if(!(i>=0 && i<nLegs) || seen.has(i)) return false;
