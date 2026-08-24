@@ -851,6 +851,8 @@
     .float { left:48px; max-width:calc(100vw - 58px); }
     .drawer-b { max-height:52vh; }
     .ctrls { right:var(--space-3); top:var(--space-3); }
+    /* above the sidebar overlay (1300), or the instruction sits behind it */
+    .hint { z-index:1400; left:calc(50% + 21px); max-width:calc(100vw - 64px); }
     .rbtn { min-width:32px; min-height:32px; }
     /* on a phone three route columns can't fit legibly — swiping the table
        sideways beats clipping the numbers, so names get their width back */
@@ -858,15 +860,16 @@
     .pane.tight .cmp th.rtsel, .pane.tighter .cmp th.rtsel { max-width:118px; }
     .pane { overflow-x:auto; -webkit-overflow-scrolling:touch; }
 
-    /* Below this width the app is a viewer. Building a route by tapping pins
-       and by the add-a-point select both work on touch, so they stay; every
-       control that depends on a hover reveal, an HTML5 drag the browser never
-       fires on touch, or a sub-20px target is hidden rather than left to fail
-       silently. Nothing here is destructive-by-accident either — clear, reverse
-       and the deletes all go with it. */
-    .loc-act, .rt-act, .rdel, .pday-act,
-    .loc-coords, .pstep,
-    #addBtn, #hint, #newRoute, #revRoute, #clearRoute,
+    /* Only what genuinely cannot work on touch is hidden here.
+       An earlier pass hid every editing control at this width under the
+       banner of read-only-on-phones. But + new, clear, reverse, the
+       per-stop remove, and the location and route actions are all ordinary
+       buttons that work perfectly well under a thumb. They were really
+       being hidden for two other reasons: 16px targets, since fixed by the
+       hit-area expansion in the hover:none block, and destructive actions
+       having no confirmation - a real problem, but not one hiding the
+       button solves. What remains is the HTML5 drag the browser never
+       fires on touch, and the copy telling you to use it. */
     .grip, .pnote, .no-touch { display:none !important; }
 
     /* Hiding a grid child does not leave a hole — it removes the item, and every
@@ -876,7 +879,7 @@
        row before this. Hide a grid child here and you must edit its template
        too. .rt and .loc are safe — .rt's hidden child is its last, and .loc is
        flex, not grid. */
-    .rleg { grid-template-columns:18px 1fr auto; }          /* pin, name, value */
+    .rleg { grid-template-columns:18px 1fr auto 18px; }   /* pin, name, value, remove */
 
     /* The plan's five columns do not fit a phone. Squeezed into ~390px the name
        truncated to "Emerald Ba..." and the departure field rendered as a bare
@@ -888,9 +891,7 @@
       gap:var(--space-1) var(--space-3); padding:var(--space-2) 0;
     }
     .pleg-nm { flex:1 0 100%; white-space:normal; }
-    /* the same shift again: .pdep is [- input +] and loses both steps, so the
-       input landed in the 16px track and clipped at 34px against 52px of content */
-    .pleg .pdep { flex:0 0 auto; grid-template-columns:1fr; }
+    .pleg .pdep { flex:0 0 auto; }
     .pleg .ptime { width:56px; min-width:0; text-align:center; }
     /* Without the column header the three times read as three unlabelled
        numbers. An arrow and a separator carry what "Depart / Arrive / Under way"
@@ -914,8 +915,7 @@
     /* the stop and day rows stop advertising a grab they can't honour */
     .rleg, .pleg { cursor:default; }
     .pbar-leg { cursor:default; }
-    /* departure times stay legible but inert — the plan reads, it doesn't edit */
-    .ptime { pointer-events:none; }
+    /* the plan edits here too: the time fields and their steps work on touch */
   }
   @media (hover:none){
     .loc-act { opacity:1; position:static; transform:none; padding-left:0; background:none; }
@@ -2466,9 +2466,15 @@ let adding=false;
 const addBtn=document.getElementById('addBtn');
 function setAdding(v){
   adding=v; addBtn.setAttribute('aria-pressed',v);
-  document.getElementById('addBtnTxt').textContent = v? 'Click the map to place it…' : 'Drop a pin on the map';
+  document.getElementById('addBtnTxt').textContent = v? 'Tap the chart to place it…' : 'Drop a pin on the map';
   document.getElementById('hint').classList.toggle('on',v);
   map.getContainer().style.cursor = v? 'crosshair':'';
+  /* On a phone the sidebar is an overlay across most of the chart, so arming
+     this from inside it leaves nowhere to tap. Get out of the way — the hint
+     bar over the chart carries the instruction from here. */
+  if(v && window.matchMedia('(max-width:720px)').matches && !S.collapsed){
+    S.collapsed=true; all(); map.invalidateSize({pan:false});
+  }
 }
 addBtn.addEventListener('click',()=>setAdding(!adding));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&adding) setAdding(false); });
