@@ -328,6 +328,14 @@
   .rnight { display:flex; gap:6px; align-items:center; margin-top:5px; font-size:11px; color:var(--warn-t); line-height:1.4; }
   .nightv { color:var(--warn-t); }
   .ctrl-row.tight-pair { padding-bottom:0; margin-bottom:calc(var(--space-3) * -1); }
+  .ftest { position:absolute; left:56px; top:var(--space-4); z-index:1500;
+    display:flex; align-items:center; gap:var(--space-3);
+    background:var(--color-surface); border:1px solid var(--color-divider);
+    border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); box-shadow:var(--shadow-lg); }
+  .ftest[hidden] { display:none; }
+  .ft-sw { width:26px; height:26px; border-radius:var(--radius-sm); background:#f00; flex:none; }
+  .ft-flt { filter:url(#ftGreen); }
+  .ft-txt { font-size:11px; color:var(--muted); line-height:1.4; max-width:210px; }
   .welcome {
     position:absolute; left:56px; top:var(--space-4); z-index:640; max-width:292px;
     background:var(--color-surface); border:1px solid var(--color-divider);
@@ -978,6 +986,11 @@
        relief tiles purely as a water MASK - keyLand's alpha - and flood that
        shape with the palette's own --sea, giving a genuinely flat sea laid over
        the imagery. One per palette because feFlood cannot read a CSS variable. -->
+  <!-- Diagnostic only, shown by ?ft=1. Maps red to green, so a swatch that
+       stays red proves filter: url(#id) is not being applied by the browser. -->
+  <filter id="ftGreen" color-interpolation-filters="sRGB">
+    <feColorMatrix type="matrix" values="0 0 0 0 0  1 0 0 0 0  0 0 0 0 0  0 0 0 1 0"></feColorMatrix>
+  </filter>
   <filter id="flatSeaDay" color-interpolation-filters="sRGB">
     <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -20 0 20 0 0.26" result="m"></feColorMatrix>
     <feFlood flood-color="#c9dcea"></feFlood>
@@ -1177,6 +1190,15 @@
       <div id="map"></div>
       <div class="hint" id="hint">Click the map to drop a new location · Esc to cancel</div>
       <div class="botread" id="botRead" hidden></div>
+      <!-- SVG-filter self test. The whole chart depends on filter: url(#id):
+           the water is keyed out of the land tiles that way, and the palettes are
+           toned that way. WebKit has not always applied it. Add ?ft=1 to the URL to
+           see whether this browser does. -->
+      <div class="ftest" id="ftest" hidden>
+        <span class="ft-sw ft-ctl"></span>
+        <span class="ft-sw ft-flt"></span>
+        <span class="ft-txt">left red = control &middot; right GREEN = SVG filters work &middot; right RED = they do not</span>
+      </div>
       <div class="welcome" id="welcome" data-on="false">
         <div class="wtitle">Sail Planner</div>
         <div class="wsub">Distances, sail time and a day-by-day plan for the Southern California Bight.</div>
@@ -4092,6 +4114,8 @@ spd.addEventListener('input',()=>{ S.spd=+spd.value; all(); });
 
 const wel=document.getElementById('welcome');
 if(!lsGet('sp_welcome')) wel.dataset.on='true';
+/* ?ft=1 shows the SVG-filter self test — see the note by .ftest */
+if(/[?&]ft=1\b/.test(location.search)) document.getElementById('ftest').hidden=false;
 document.getElementById('wgo').addEventListener('click',()=>{
   wel.dataset.on='false'; lsSet('sp_welcome','1');
 });
