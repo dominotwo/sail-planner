@@ -641,6 +641,12 @@
   .iconx:hover { color:var(--ac); border-color:var(--ac-line); background:var(--ac-fill); }
 
   /* ---------- plan dock: days down the page, legs inside them ---------- */
+  /* The bar, the tide curve, the axis and the leg row all share one 24-hour
+     x-mapping, so they are capped together rather than individually - capping
+     one would break the alignment. At full desktop width the tide curve was
+     23px of amplitude across 1409px, a 61:1 aspect that reads as a straight
+     line, and name-to-times was a very long eye-track. */
+  .pday, .pcols { max-width:980px; }
   .pday { border-top:1px solid var(--line); padding:var(--space-3) 0 var(--space-4); }
   .pday:first-child { border-top:0; }
   .pday.over { background:var(--ac-fill); }
@@ -1001,6 +1007,13 @@
     /* the grip is the drag handle and now the primary way to reorder here, so it
        gets a finger-sized target of its own */
     .rleg .grip, .pleg .grip { padding:6px 4px; margin:-6px -4px; }
+    /* Measured in the plan panel: the +/-15min steps were 16x18, the Tides
+       checkbox 15x15 and the day insert/remove 20x16. Grown with a pseudo
+       element so nothing moves and no layout is re-measured. */
+    .pstep, .pday-act .btn, .phead .chk input { position:relative; }
+    .pstep::after,
+    .pday-act .btn::after { content:""; position:absolute; inset:-5px -3px; }
+    .phead .chk input::after { content:""; position:absolute; inset:-6px; }
     .rmove { gap:var(--space-2); }
     .rmove .btn { min-width:26px; min-height:24px; font-size:10px; padding:0; }
     .rmove .btn::after { inset:-2px 0; }
@@ -4886,7 +4899,7 @@ function renderPlan(){
               +(d.moon.rise? '\u2191'+HHMM(d.moon.rise):'')+(d.moon.set? ' \u2193'+HHMM(d.moon.set):'')+'</span>' : ''}
         </span>
         <span class="pday-tot">
-          ${d.legs.length? '<span>'+hm(d.hours)+' under way</span>' : ''}
+          ${d.legs.length>1? '<span>'+hm(d.hours)+' under way</span>' : ''}   <!-- one leg already prints its own duration in the row below -->
           ${d.dark>0.05? '<span class="pday-dark">'+MOON+hrsTxt(d.dark)+' dark</span>' : ''}
           <span class="pday-act">
             <button class="btn btn-ghost mini" data-pact="add" data-day="${d.k}" title="Insert a day after this one">+</button>
@@ -4894,7 +4907,7 @@ function renderPlan(){
           </span>
         </span>
       </div>
-      ${bar}${layover}${rows}
+      ${planScale()}${bar}${layover}${rows}
     </div>`;
   }).join('');
   const nights=days.filter(d=>d.dark>0.05).length;
@@ -4911,7 +4924,6 @@ function renderPlan(){
     </div>
     <div class="pnote">Drag a leg onto another day to sail two in one push; \u21a7 gives it a day back. Drag a leg on the day bar to shift its departure.</div>
     <div class="pcols"><span></span><span>Leg</span><span>Depart</span><span>Arrive</span><span>Under way</span><span></span></div>
-    ${planScale()}
     ${html}`;
   if(sub) sub.textContent = days.length+' day'+(days.length===1?'':'s')
     + ' \u00b7 '+distLbl(days.reduce((s,d)=>s+d.legs.reduce((t,g)=>t+g.l.d,0),0))+' '+unitTxt()
