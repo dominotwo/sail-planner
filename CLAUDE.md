@@ -95,6 +95,11 @@ The day bar is a fixed 24-hour scale: x = hour/24. The axis (`.pscale`), the
 day bars, the leg blocks and the tide curve all share that mapping — change one
 and change all four.
 
+A day's first leg departs at `DAY_START` (09:00) unless that leg has a time of
+its own in `p.dep[i]`. It is a constant, not state — it used to be a "Days
+start" field in the plan header and a `S.depTime` key. Per-leg departures are
+untouched by this: tap a departure or drag the leg on the day bar.
+
 ## Traps this file has already sprung
 Each of these cost a debugging round. They are all still live.
 

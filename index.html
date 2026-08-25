@@ -1102,8 +1102,9 @@
     /* Six non-shrinking children in a nowrap flex row: the title collapsed to
        three lines and the route name to "Isla...". Let it wrap, and drop the
        subtitle — its numbers are all repeated in the rows below. */
-    /* Start / Days start / Tides is a nowrap row of fixed-width fields totalling
-       ~355px; it overflowed a 299px pane rather than wrapping. */
+    /* Start / Tides. This was Start / Days start / Tides, ~355px of nowrap
+       fixed-width fields in a 293px row; dropping the middle pair leaves 269px
+       and it fits on one line. The wrap stays as a floor for a narrower phone. */
     .phead { flex-wrap:wrap; row-gap:var(--space-2); }
     /* the date plus sun and moon times do not fit one line at 360px */
     /* The moonrise and moonset times are what pushed the day actions onto a
@@ -2022,6 +2023,13 @@ const FRESH = !lsGet();                    // first visit: pick sensible default
    visitors keep whatever they saved; every default below is gated on FRESH. */
 const DEMO = ['nwp','eme','sbi','ava','nwp'];
 const DEMO_START = '2026-08-27';
+/* The departure a day's first leg takes unless that leg has one of its own.
+   This was a field in the plan header, set per plan and saved as S.depTime.
+   It was one of five fixed-width controls in a row that could not fit a phone,
+   and it was answering a question that has one sensible answer - so it is a
+   constant now. A leg that wants a different time still gets one: tap its
+   departure, or drag it on the day bar. */
+const DAY_START = '09:00';
 /* Route identity hues, deliberately clear of the pairwise magnitude ramps
    (amber 42° on dusk/night, crimson 335° on day) and of each other. Colour is
    assigned by position among the SHOWN routes, so the ≤3 on the map can never
@@ -2031,7 +2039,7 @@ const HUES=[190,285,105,225,60];
 const S = Object.assign({
   locs: SEED.map(l=>({...l, on:true})),
   mode:'dist', mxMode:'dist', unit:'nm', legsView: FRESH?'route':'all', pal:'dusk', spd:6, tack:true, wdir:293, tws:12,
-  route: FRESH?[...DEMO]:[], drawer:false, planOpen:false, plans: FRESH?{r1:{start:DEMO_START, days:[], dep:{}}}:{}, clock24:true, depTime:'08:00', tides:false, mxOpen:false, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
+  route: FRESH?[...DEMO]:[], drawer:false, planOpen:false, plans: FRESH?{r1:{start:DEMO_START, days:[], dep:{}}}:{}, clock24:true, tides:false, mxOpen:false, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
   routes:[{id:'r1', name: FRESH?'Island loop':'Route 1', hue:HUES[0], stops: FRESH?[...DEMO]:[]}],
   activeRoute:'r1', shown:['r1'], baseline:'r1'
 }, (()=>{ try{ return JSON.parse(lsGet())||{}; }catch(e){ return {}; } })());
@@ -2113,7 +2121,7 @@ const save = () => { try{ syncRoute(); lsSet(LS, JSON.stringify(S)); }catch(e){}
 S.routes.forEach(r=>{ r.stops=liveStops(r.stops); });
 S.route=liveStops(S.route);
 delete S.depAt;                     // the plan owns the calendar now
-if(!S.depTime) S.depTime='08:00';
+delete S.depTime;                                                // was the "days start" field; a constant now
 const active = () => S.locs.filter(l=>l.on);
 
 /* ---------------- format ---------------- */
@@ -4757,11 +4765,6 @@ document.getElementById('planBody').addEventListener('change', e=>{
   }
   if(e.target.id==='planStart'){ const v=e.target.value; if(v) planEdit(p=>{ p.start=v; }); return; }
   if(e.target.id==='planTide'){ S.tides=e.target.checked; renderPlan(); fitPlan(); save(); return; }
-  if(e.target.id==='planDefT'){
-    const v=parseHM(e.target.value);
-    if(v==null){ renderPlan(); return; }
-    S.depTime=v; renderPlan(); fitPlan(); save();
-  }
 });
 /* drag a leg into another day: that is how two legs become one long push */
 let planDragLeg=null;
@@ -5027,7 +5030,7 @@ function planFor(id){
 function planSchedule(id){
   const p=planFor(id); if(!p) return null;
   const stops=stopsOf(id);
-  const defTime=S.depTime||'08:00';
+  const defTime=DAY_START;
   let where=byId(stops[0]);
   const days=p.days.map((legIdxs,k)=>{
     const date=planDate(p.start,k);
@@ -5211,8 +5214,6 @@ function renderPlan(){
   body.innerHTML = `<div class="phead">
       <span class="phead-l">Start</span>
       <input class="ptime" type="date" id="planStart" value="${p.start}" title="Slide the whole plan to another date">
-      <span class="phead-l">Days start</span>
-      <input class="ptime hm" type="text" inputmode="numeric" maxlength="8" id="planDefT" value="${HHMM(atTime(new Date(), S.depTime||'08:00'))}" title="The departure a day's first leg takes unless you set it">
       <label class="chk" title="A tide curve under each day, from the nearest NOAA station">
         <input type="checkbox" id="planTide"${S.tides?' checked':''}>Tides
       </label>
