@@ -137,7 +137,12 @@
   :focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
   ::selection { background: var(--ac-fill); }
 
-  .app { display:grid; grid-template-columns: 306px 1fr; grid-template-rows: minmax(0,1fr); height:100vh; }
+  /* 100vh on iOS is the viewport with the browser chrome HIDDEN, so the layout
+     runs taller than what you can actually see and the address bar and toolbar
+     cover the top and bottom of the app. dvh tracks the visible area as that
+     chrome shows and hides. The vh line stays as the fallback. */
+  .app { display:grid; grid-template-columns: 306px 1fr; grid-template-rows: minmax(0,1fr);
+         height:100vh; height:100dvh; }
   .app[data-collapsed="true"] { grid-template-columns: 42px 1fr; }
   .sidecol { display:flex; min-width:0; min-height:0; border-right:1px solid var(--line); }
   .rail { display:none; flex-direction:column; align-items:center; gap:var(--space-3); padding:var(--space-4) 0; width:42px; }
@@ -146,7 +151,7 @@
   /* collapsed peek: hovering a rail icon floats just that section out */
   .app[data-collapsed="true"][data-peek] .side {
     display:flex; position:fixed; left:46px; top:var(--peek-top,8px); bottom:auto;
-    width:300px; height:auto; max-height:min(76vh, calc(100vh - 16px)); z-index:1200;
+    width:300px; height:auto; max-height:min(76dvh, calc(100dvh - 16px)); z-index:1200;
     background:var(--color-bg); border:1px solid var(--line); border-radius:var(--radius-md);
     box-shadow:var(--shadow-md); overflow:hidden;
   }
@@ -892,7 +897,11 @@
     }
     .app[data-collapsed="true"] .side { display:none; }
     .app[data-collapsed="true"][data-peek] .side { width:min(324px, calc(100vw - 52px)); }
-    .float { left:48px; max-width:calc(100vw - 58px); }
+    /* Sits below the Conditions pill rather than under it. There is no room to
+       put the float beside Conditions at this width - they overlapped by 172x270
+       - and fitFloat's "drop below" branch needs 230px of clearance it does not
+       have here, so it is placed unconditionally instead. */
+    .float { left:48px; max-width:calc(100vw - 58px); top:60px; }
     .drawer-b { max-height:52vh; }
     .ctrls { right:var(--space-3); top:var(--space-3); }
     /* above the sidebar overlay (1300), or the instruction sits behind it */
@@ -903,6 +912,20 @@
     .pane.tight .cmp td.wp, .pane.tighter .cmp td.wp,
     .pane.tight .cmp th.rtsel, .pane.tighter .cmp th.rtsel { max-width:118px; }
     .pane { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+    /* One surface at a time. Measured at 390x844 with everything open: the
+       sidebar alone covers 83% of the screen, 89% of the viewport sits under some
+       panel, and five pairs overlap - Conditions and the matrix overlap each other
+       by 172x270 while both sit behind the sidebar, unreachable. Floating over the
+       chart is right on a desktop, where they sit beside a large map; at this
+       width it is clutter behind an opaque panel. */
+    .app[data-collapsed="false"] .ctrls,
+    .app[data-collapsed="false"] .float,
+    .app[data-collapsed="false"] #drawer,
+    .app[data-collapsed="false"] #planDock { display:none; }
+    /* The docks are hidden rather than closed: their state survives, so closing
+       the sidebar brings the plan back exactly as you left it. Opening a dock
+       closes the sidebar (see setPlan / setCompare), so the two never fight. */
 
     /* Only what genuinely cannot work on touch is hidden here.
        An earlier pass hid every editing control at this width under the
@@ -923,7 +946,7 @@
        row before this. Hide a grid child here and you must edit its template
        too. .rt and .loc are safe — .rt's hidden child is its last, and .loc is
        flex, not grid. */
-    .rleg { grid-template-columns:18px 1fr auto 16px 18px; }  /* pin, name, value, move, remove */
+    .rleg { grid-template-columns:18px 1fr auto 26px 18px; }  /* pin, name, value, move, remove */
 
     /* The plan's five columns do not fit a phone. Squeezed into ~390px the name
        truncated to "Emerald Ba..." and the departure field rendered as a bare
@@ -971,6 +994,13 @@
     /* These are opacity:0 until their row is hovered. With no hover they are
        present, sized and clickable but invisible - worse than absent. */
     .rt-act, .rdel, .pday-act, .rmove { opacity:1; }
+    /* The stacked arrows were 16x10 with a 1px gap and an 8px glyph, and their
+       expanded hit areas overlapped - the midpoint between them resolved to the
+       DOWN arrow, so pressing "up" could move a stop the wrong way. Real size
+       here, with the expansion kept inside the gap so they stay independent. */
+    .rmove { gap:var(--space-2); }
+    .rmove .btn { min-width:26px; min-height:24px; font-size:10px; padding:0; }
+    .rmove .btn::after { inset:-2px 0; }
     .btn.mini, .loc-chk, .rt-eye { position:relative; }
     .btn.mini::after  { content:""; position:absolute; inset:-5px -2px; }
     .loc-chk::after   { content:""; position:absolute; inset:-5px; }   /* 16px box -> 26px target */
@@ -4298,11 +4328,20 @@ function availBody(self){
   return Math.max(110, room - myHead - otherHead - otherBody);
 }
 function setPlan(on){
+  /* the docks sit under the sidebar overlay at phone width, so opening one
+     from inside the sidebar would put it somewhere you cannot see */
+  if(on && window.matchMedia('(max-width:720px)').matches && !S.collapsed){
+    /* S.collapsed alone is not enough — the CSS reads appEl's data-collapsed,
+       and neither of these functions calls all() */
+    S.collapsed=true; appEl.dataset.collapsed='true';
+  }
   S.planOpen=!!on;
   document.getElementById('planBtn').setAttribute('aria-pressed', S.planOpen);
   if(S.planOpen) renderPlan();
   fitPlan(); fitDrawer(); save();
-  requestAnimationFrame(()=>{ map.invalidateSize({pan:false}); fitPlan(); fitDrawer(); });
+  /* the float sizes itself against the free chart height, so it has to re-fit
+     when a dock takes some of it — setCompare already does this */
+  requestAnimationFrame(()=>{ map.invalidateSize({pan:false}); fitPlan(); fitDrawer(); if(S.mxOpen) fitFloat(); });
 }
 function fitPlan(){
   const b=planDock.querySelector('.drawer-b');
@@ -4463,14 +4502,28 @@ const NAME={matrix:'Time matrix', compare:'Compare routes'};
 const mxName = () => S.mxMode==='dist'? 'Distance matrix':'Time matrix';
 const mxFloat=document.getElementById('mxFloat');
 function setMatrix(on){
+  /* The matrix float lands on top of Conditions at phone width - they overlap
+     by 172x270 - so they take turns rather than stack.
+     Setting S.ctrls is not enough: all() owns the Conditions DOM (data-open,
+     aria-expanded and the collapsed summary text) and none of the set* helpers
+     call it. setPlan and setCompare had the same gap with data-collapsed. If
+     you change S.<something> in here, make sure something applies it. */
+  const collapseCtrls = on && window.matchMedia('(max-width:720px)').matches && S.ctrls!==false;
+  if(collapseCtrls) S.ctrls=false;
   S.mxOpen=!!on;
   if(S.mxOpen && S.drawer) setCompare(false);      // one surface at a time over the chart
   mxFloat.dataset.open = S.mxOpen? 'true':'false';
   document.getElementById('mxBtn').setAttribute('aria-pressed', S.mxOpen);
   if(S.mxOpen) fitFloat();
   save();
+  if(collapseCtrls) all();
 }
 function setCompare(on){
+  if(on && window.matchMedia('(max-width:720px)').matches && !S.collapsed){
+    /* S.collapsed alone is not enough — the CSS reads appEl's data-collapsed,
+       and neither of these functions calls all() */
+    S.collapsed=true; appEl.dataset.collapsed='true';
+  }
   S.drawer=!!on;
   if(S.drawer && S.mxOpen){ S.mxOpen=false; mxFloat.dataset.open='false'; document.getElementById('mxBtn').setAttribute('aria-pressed',false); }
   document.getElementById('cmpBtn').setAttribute('aria-pressed', S.drawer);
@@ -4480,6 +4533,10 @@ function setCompare(on){
 }
 /* the float grows to its table, capped to the chart it floats over */
 function fitFloat(){
+  /* the phone layout places this in CSS; an inline top from the branch below
+     would override it and put the float back under the Conditions pill */
+  const narrow = window.matchMedia('(max-width:720px)').matches;
+  if(narrow) mxFloat.style.top='';
   const b=mxFloat.querySelector('.float-b');
   const mw=document.querySelector('.map-wrap');
   const mwR=mw.getBoundingClientRect();
@@ -4490,7 +4547,7 @@ function fitFloat(){
   const sideRoom=c.left-10-fR.left, fullRoom=mwR.right-8-fR.left;
   /* if the table can't fit beside the Conditions panel, drop below it and take
      the full chart width instead of scrolling sideways */
-  if(!mxMoved && need>sideRoom && fullRoom>sideRoom && mw.clientHeight-(c.bottom-mwR.top) > 230){
+  if(!narrow && !mxMoved && need>sideRoom && fullRoom>sideRoom && mw.clientHeight-(c.bottom-mwR.top) > 230){
     mxFloat.style.top = (c.bottom-mwR.top+18)+'px';
     fR=mxFloat.getBoundingClientRect();
   }
