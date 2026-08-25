@@ -1014,6 +1014,26 @@
     .ctrls { right:calc(var(--space-3) + var(--safe-r)); top:calc(var(--space-3) + var(--safe-t)); }
     /* above the sidebar overlay (1300), or the instruction sits behind it */
     .hint { z-index:1400; left:calc(50% + 21px); max-width:calc(100vw - 64px); }
+
+    /* ---------------- M7: the welcome card is a bottom sheet ----------------
+       Measured at 390px it was 292x247 at x=98 - three quarters of the width,
+       right edge flush to the screen, and sitting exactly over the
+       Newport-Emerald Bay-Avalon passage that step 1 tells you to look at.
+       At the bottom the chart it describes stays visible and the button
+       reaches the thumb. fitAll pads the fit by its height while it is up, so
+       the sample route is drawn above it rather than under it. */
+    .welcome {
+      left:var(--space-4); right:var(--space-4); top:auto;
+      /* clear of the attribution, not on top of it: Leaflet's controls sit at
+         z-index 1000 and this at 640, so it painted over the sheet's bottom
+         edge and the Start button. Raising the sheet instead would have hidden
+         "Planning only - not for navigation", which is the one line on this
+         page that has to stay readable. 40px is that bar at its two-line
+         height on a 360px screen. */
+      bottom:calc(var(--space-4) + var(--safe-b) + 40px);
+      max-width:none; padding:var(--space-6) var(--space-4) var(--space-4);
+    }
+    .welcome #wgo { width:100%; min-height:44px; font-size:13px; }
     .rbtn { min-width:32px; min-height:32px; }
     /* on a phone three route columns can't fit legibly — swiping the table
        sideways beats clipping the numbers, so names get their width back */
@@ -1076,7 +1096,7 @@
     /* 2 - off the floor: these are sentences and names, not labels. */
     .rt-meta, .rnote, .pnote, .mx-note, .cmpsub, .cmpm,
     .legend-for, .pin-lbl, .pday-sun, .pday-twi, .pday-moon, .pday-dark,
-    .route-empty, .brand-sub { font-size:12px; }
+    .route-empty, .brand-sub, .wsub { font-size:12px; }
     /* These two are 11.5, not 12, and the half point is load-bearing. Both sit
        on a line with a fixed-width neighbour and both cross their line's budget
        at 12: the route leg's meta wraps to a second line, and the plan leg's
@@ -4701,9 +4721,24 @@ if(/[?&]ft=1\b/.test(location.search)) setTimeout(()=>{
   probe.onerror=()=>{ out.textContent=L.join('\n')+'\ncanvas   : TILE FAILED TO LOAD with CORS'; };
   probe.src=t.src;
 }, 2500);
-document.getElementById('wgo').addEventListener('click',()=>{
+/* Has the visitor moved the chart themselves? Only used to decide whether
+   dismissing the welcome sheet may re-fit - re-fitting under someone who has
+   panned somewhere on purpose is worse than a route sitting a little high. */
+let mapMoved=false;
+map.on('dragstart', ()=>{ mapMoved=true; });
+map.getContainer().addEventListener('wheel', ()=>{ mapMoved=true; }, {passive:true});
+
+function dismissWelcome(){
+  if(wel.dataset.on!=='true') return;
   wel.dataset.on='false'; lsSet('sp_welcome','1');
-});
+  /* the fit was padded by the sheet's height; take that back now it is gone */
+  if(!mapMoved) fitAll();
+}
+document.getElementById('wgo').addEventListener('click', dismissWelcome);
+/* A sheet across the bottom of the chart should also go when you touch the
+   chart, which is the first thing anyone does. Not while a pin is being placed:
+   that tap has a job already, and re-fitting would move the chart under it. */
+map.on('click', ()=>{ if(narrow() && !adding) dismissWelcome(); });
 map.attributionControl.addAttribution('Planning only \u2014 not for navigation');
 
 const tws=document.getElementById('tws');
@@ -5200,8 +5235,13 @@ function fitAll(){
   const c=document.getElementById('ctrls');
   const open = c && c.dataset.open!=='false';
   const right = c && c.offsetParent ? (open? c.offsetWidth+28 : 44) : 32;   // collapsed, it only costs the top strip
+  /* and clear of the welcome sheet, which on a phone sits across the bottom of
+     the chart - the sample route is the thing step 1 asks you to look at, so it
+     must not be drawn underneath it */
+  const wl=document.getElementById('welcome');
+  const wh = (wl && wl.dataset.on==='true' && narrow()) ? wl.offsetHeight + 16 : 0;
   map.fitBounds(L.latLngBounds(a.map(l=>[l.lat,l.lon])), {
-    paddingTopLeft:[34,34], paddingBottomRight:[right,38], maxZoom:11, animate:false
+    paddingTopLeft:[34,34], paddingBottomRight:[right, 38+wh], maxZoom:11, animate:false
   });
   if(map.getZoom()<8) map.setZoom(8,{animate:false});
 }
