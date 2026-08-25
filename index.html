@@ -927,17 +927,14 @@
        the sidebar brings the plan back exactly as you left it. Opening a dock
        closes the sidebar (see setPlan / setCompare), so the two never fight. */
 
-    /* Only what genuinely cannot work on touch is hidden here.
-       An earlier pass hid every editing control at this width under the
-       banner of read-only-on-phones. But + new, clear, reverse, the
-       per-stop remove, and the location and route actions are all ordinary
-       buttons that work perfectly well under a thumb. They were really
-       being hidden for two other reasons: 16px targets, since fixed by the
-       hit-area expansion in the hover:none block, and destructive actions
-       having no confirmation - a real problem, but not one hiding the
-       button solves. What remains is the HTML5 drag the browser never
-       fires on touch, and the copy telling you to use it. */
-    .grip, .pnote, .no-touch { display:none !important; }
+    /* Nothing is hidden here any more.
+       Two passes hid controls at this width on the premise that HTML5 drag never
+       fires on touch. That is wrong: iOS Safari maps a long press onto the drag
+       API, so dragging a stop or a plan leg works on a phone - and is easier than
+       the arrow buttons, per Chris on the device. Hiding the grips removed the
+       only affordance for a gesture that worked all along, and hiding .pnote and
+       .no-touch removed the copy that would have told you so.
+       The move arrows stay as a discoverable alternative. */
 
     /* Hiding a grid child does not leave a hole — it removes the item, and every
        later sibling slides one column to the left. .rleg loses .grip and .rdel,
@@ -957,7 +954,10 @@
       display:flex; flex-wrap:wrap; align-items:center;
       gap:var(--space-1) var(--space-3); padding:var(--space-2) 0;
     }
-    .pleg-nm { flex:1 0 100%; white-space:normal; }
+    /* the grip shares the first line with the name rather than sitting alone on
+       one of its own: 100% basis pushed everything else off, including it */
+    .pleg .grip { flex:0 0 auto; align-self:center; }
+    .pleg-nm { flex:1 0 calc(100% - 34px); white-space:normal; }
     .pleg .pdep { flex:0 0 auto; }
     .pleg .ptime { width:56px; min-width:0; text-align:center; }
     /* Without the column header the three times read as three unlabelled
@@ -998,6 +998,9 @@
        expanded hit areas overlapped - the midpoint between them resolved to the
        DOWN arrow, so pressing "up" could move a stop the wrong way. Real size
        here, with the expansion kept inside the gap so they stay independent. */
+    /* the grip is the drag handle and now the primary way to reorder here, so it
+       gets a finger-sized target of its own */
+    .rleg .grip, .pleg .grip { padding:6px 4px; margin:-6px -4px; }
     .rmove { gap:var(--space-2); }
     .rmove .btn { min-width:26px; min-height:24px; font-size:10px; padding:0; }
     .rmove .btn::after { inset:-2px 0; }
