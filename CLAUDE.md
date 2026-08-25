@@ -103,6 +103,16 @@ size must set it *before* calling `availBody`. Both drag handlers and
 on release. `fitDocks()` fits all three, because `availBody` is a function of
 all of them.
 
+**Maximised** (`S.pmax`, plan dock only) goes straight to the stage height and
+skips `availBody` entirely — that function's job is protecting a share for the
+map, which is the opposite of what maximised wants. It still uses `max-height`,
+so a plan shorter than the screen leaves a strip of chart rather than dead
+space; the Conditions pill and the zoom control hide while it is on, because
+they were floating in that strip over nothing. Dragging the header clears it —
+a dragged height *is* an un-maximise. Measured at 390×844: a four-day plan is
+704px with tides off and fits a 764px maximised body; with tides on it is 912px
+and still scrolls.
+
 Header heights are **measured**, not assumed to be 40px — a phone dock header is
 ~63px once its controls are finger-sized, and the estimate is what put the chart
 at 43% against a 45% floor.

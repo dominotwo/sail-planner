@@ -756,6 +756,20 @@
     color:var(--muted-2); font-size:13px; line-height:1;
   }
   .iconx:hover { color:var(--ac); border-color:var(--ac-line); background:var(--ac-fill); }
+  /* one button, two glyphs — whichever is not the current state is hidden */
+  #planMax .mx-close, #planMax[aria-pressed="true"] .mx-open { display:none; }
+  #planMax[aria-pressed="true"] .mx-close { display:block; }
+  #planMax[aria-pressed="true"] { color:var(--ac); border-color:var(--ac); background:var(--ac-fill); }
+  /* Maximised is a reading view: the note tells you about gestures, which is
+     not what you opened the whole screen to look at. Worth 44px. */
+  .drawer[data-max="true"] .pnote { display:none; }
+  /* The dock takes what it needs rather than all it may, so a plan shorter than
+     the screen leaves a strip of chart under it - and the Conditions pill and
+     the zoom control were floating in that strip, over nothing. They go while
+     the plan is maximised. The attribution stays: "Planning only - not for
+     navigation" does not get to be hidden by a layout mode. */
+  :root[data-pmax="true"] .ctrls,
+  :root[data-pmax="true"] .leaflet-control-zoom { display:none; }
 
   /* ---------- plan dock: days down the page, legs inside them ---------- */
   /* The bar, the tide curve, the axis and the leg row all share one 24-hour
@@ -2076,6 +2090,14 @@
             <button class="btn btn-ghost mini" id="planIcs" title="Download the plan as calendar events (.ics)">Calendar (.ics)</button>
           </span>
         </span>
+        <button class="iconx" id="planMax" title="Fill the screen" aria-label="Fill the screen" aria-pressed="false">
+          <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true" class="mx-open">
+            <path d="M1 5 V1 H5 M9 1 H13 V5 M13 9 V13 H9 M5 13 H1 V9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true" class="mx-close">
+            <path d="M5 1 V5 H1 M13 5 H9 V1 M9 13 V9 H13 M1 9 H5 V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
         <button class="iconx" data-hide="1" title="Close" aria-label="Close">×</button>
       </div>
       <div class="drawer-b">
@@ -2368,7 +2390,7 @@ const HUES=[190,285,105,225,60];
 const S = Object.assign({
   locs: SEED.map(l=>({...l, on:true})),
   mode:'dist', mxMode:'dist', unit:'nm', legsView: FRESH?'route':'all', pal:'dusk', spd:6, tack:true, wdir:293, tws:12,
-  route: FRESH?[...DEMO]:[], drawer:false, planOpen:false, plans: FRESH?{r1:{start:DEMO_START, days:[], dep:{}}}:{}, clock24:true, tides:false, mxOpen:false, mh:null, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
+  route: FRESH?[...DEMO]:[], drawer:false, planOpen:false, plans: FRESH?{r1:{start:DEMO_START, days:[], dep:{}}}:{}, clock24:true, tides:false, mxOpen:false, mh:null, pmax:false, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
   routes:[{id:'r1', name: FRESH?'Island loop':'Route 1', hue:HUES[0], stops: FRESH?[...DEMO]:[]}],
   activeRoute:'r1', shown:['r1'], baseline:'r1'
 }, (()=>{ try{ return JSON.parse(lsGet())||{}; }catch(e){ return {}; } })());
@@ -5386,7 +5408,22 @@ function fitPlan(){
   const b=planDock.querySelector('.drawer-b');
   if(!b) return;
   planDock.dataset.open = S.planOpen? 'true':'false';
+  planDock.dataset.max = (S.planOpen && S.pmax)? 'true':'false';
+  document.documentElement.dataset.pmax = (S.planOpen && S.pmax)? 'true':'false';
+  const mxb=document.getElementById('planMax');
+  if(mxb) mxb.setAttribute('aria-pressed', !!(S.planOpen && S.pmax));
   if(!S.planOpen){ b.style.maxHeight=''; return; }
+  /* Maximised takes the whole stage, MIN_CHART included - the point is to read
+     a plan end to end without scrolling, and 72px of chart under it is not a
+     chart, it is a stripe. Straight to the height rather than through
+     availBody, whose whole job is protecting a share for the map. */
+  if(S.pmax){
+    const top0=holdScroll('plan');
+    const head=planTop.offsetHeight;
+    b.style.maxHeight = Math.max(110, document.querySelector('.stage').clientHeight - head) + 'px';
+    releaseScroll('plan', top0);
+    return;
+  }
   const top=holdScroll('plan');
   b.style.maxHeight='none';
   const need=document.getElementById('panePlan').scrollHeight + 10;
@@ -5395,6 +5432,12 @@ function fitPlan(){
   releaseScroll('plan', top);
 }
 document.getElementById('planBtn').addEventListener('click', ()=>setPlan(!S.planOpen));
+document.getElementById('planMax').addEventListener('click', e=>{
+  e.stopPropagation();                       // the header is also a resize handle
+  S.pmax=!S.pmax;
+  fitDocks(); save();
+  requestAnimationFrame(()=>{ map.invalidateSize({pan:false}); fitDocks(); });
+});
 document.getElementById('clockSeg').querySelectorAll('input').forEach(inp=>{
   inp.checked = (inp.value==='24') === (S.clock24!==false);
   inp.addEventListener('change', ()=>{ S.clock24 = inp.value==='24'; renderPlan(); fitPlan(); save(); });
@@ -5431,6 +5474,7 @@ planTop.addEventListener('pointerdown', e=>{
   planTop.setPointerCapture(e.pointerId);
   const move=ev=>{
     /* same ceiling fitPlan will apply, so releasing never springs back */
+    S.pmax=false;                                  // dragging a height IS un-maximising
     if(S.ph==null) S.ph=startH;                    // deliberately sized from here on
     S.ph=Math.max(90, Math.min(startH+(startY-ev.clientY), availBody('plan')));
     b.style.maxHeight=S.ph+'px'; map.invalidateSize({pan:false});
@@ -5707,6 +5751,7 @@ document.querySelector('.map-wrap').addEventListener('pointerdown', e=>{
 });
 window.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
+  if(S.planOpen && S.pmax){ S.pmax=false; fitDocks(); save(); map.invalidateSize({pan:false}); return; }
   if(S.mxOpen) setMatrix(false);
   else if(S.drawer) setCompare(false);
 });
