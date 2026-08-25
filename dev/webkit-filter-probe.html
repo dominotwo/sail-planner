@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebKit reference-filter probe — Sail Planner</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin:0; padding:24px 20px 60px;
+    background:#161826; color:#e9e9ed;
+    font:15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width:640px; margin:0 auto; }
+  h1 { font-size:20px; letter-spacing:-.01em; margin:0 0 4px; }
+  .sub { color:#8e90a6; margin:0 0 28px; }
+  .grid {
+    display:grid; grid-template-columns:repeat(5,1fr); gap:8px;
+    margin:0 0 10px;
+  }
+  .grid b { font-size:11px; font-weight:500; color:#8e90a6; text-align:center; letter-spacing:.02em; }
+  .sw { display:block; height:56px; border-radius:6px; background:#f00; }
+
+  /* 1 — a plain reference filter. Known good everywhere. */
+  .url    { filter:url(#green); }
+  /* 2 — a reference filter ON a composited element. This is the one that
+         decides the fix: green means WebKit will render a reference filter
+         into a composited layer's own backing store, so filtering each tile
+         individually works. */
+  .url3d  { filter:url(#green); transform:translate3d(0,0,0); }
+  /* 3 — filter on the PARENT with a composited child inside: the tile-pane
+         case. Expected RED — the child escapes the ancestor's software
+         filter, which is the whole bug. */
+  .par    { filter:url(#green); display:block; line-height:0; }
+  .kid3d  { transform:translate3d(0,0,0); height:56px; border-radius:6px; background:#f00; display:block; }
+  /* 4 — control: a FUNCTION filter composites fine, so this must be green.
+         If it is red, something is wrong with the page, not with WebKit. */
+  .fn3d   { filter:hue-rotate(120deg); transform:translate3d(0,0,0); }
+
+  .legend { border-top:1px solid #2a2c3d; margin-top:28px; padding-top:20px; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { text-align:left; padding:7px 10px 7px 0; vertical-align:top; border-bottom:1px solid #23253a; }
+  th { color:#8e90a6; font-weight:500; white-space:nowrap; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em; background:#1d1f2e; padding:1px 5px; border-radius:4px; }
+  .ok  { color:#5fbf95; }
+  .bad { color:#e0645a; }
+  p { margin:0 0 14px; }
+</style>
+</head>
+<body>
+<main>
+
+  <h1>WebKit reference-filter probe</h1>
+  <p class="sub">Every swatch starts red. Green means <code>filter: url(#id)</code> reached the pixels.</p>
+
+  <div class="grid">
+    <b>ctl</b><b>url</b><b>url+3d</b><b>child</b><b>fn+3d</b>
+    <span class="sw"></span>
+    <span class="sw url"></span>
+    <span class="sw url3d"></span>
+    <span class="par"><span class="kid3d"></span></span>
+    <span class="sw fn3d"></span>
+  </div>
+
+  <div class="legend">
+    <table>
+      <tr><th>ctl</th><td>No filter. Stays <span class="bad">red</span> — it is the reference the others are read against.</td></tr>
+      <tr><th>url</th><td>A plain reference filter. <span class="ok">Green</span> everywhere.</td></tr>
+      <tr><th>url+3d</th><td><b>The one that matters.</b> A reference filter <em>on</em> a composited element. <span class="ok">Green</span> means WebKit paints it into that layer's own backing store — so filtering each tile individually works.</td></tr>
+      <tr><th>child</th><td>Filter on the <em>parent</em>, composited child inside: the tile-pane case. Expected <span class="bad">red</span>. This is the bug.</td></tr>
+      <tr><th>fn+3d</th><td>Control. A <em>function</em> filter composites fine, so this must be <span class="ok">green</span>. If it is red, the page is broken, not the browser.</td></tr>
+    </table>
+  </div>
+
+  <div class="legend">
+    <p><b>Why this exists.</b> The chart depends on <code>filter: url(#id)</code>: the water is keyed out of the land tiles that way and the palettes are toned that way. WebKit bars any filter list containing a <code>url()</code> reference from the CoreAnimation compositor (<code>RenderLayerBacking::updateFilters</code>), so a reference filter only runs in the software paint path — and Leaflet gives every tile a <code>translate3d</code>, making each tile its own composited layer whose pixels never pass through an ancestor's software filter.</p>
+
+    <p><b>The answer, measured on an iPhone (2026-08-24):</b> <code>child</code> red, <code>url+3d</code> green. A composited layer that cannot composite its own filter paints it in software into its own backing — so moving the filter onto the tile itself works. That is the <code>@supports (-webkit-touch-callout: none)</code> block at the end of <code>index.html</code>'s stylesheet.</p>
+
+    <p><b>When to run it.</b> Open <code>/dev/webkit-filter-probe.html</code> on the device if the chart stops toning on iOS after a Safari release. If <code>url+3d</code> ever turns red, the per-tile fix has stopped working and the next thing to try is filtering the tiles in JS on a canvas.</p>
+  </div>
+
+</main>
+
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <!-- maps red to green, so a swatch that stays red proves the filter was not applied -->
+  <filter id="green" color-interpolation-filters="sRGB">
+    <feColorMatrix type="matrix" values="0 0 0 0 0  1 0 0 0 0  0 0 0 0 0  0 0 0 1 0"></feColorMatrix>
+  </filter>
+</svg>
+</body>
+</html>

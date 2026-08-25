@@ -138,6 +138,17 @@ its own in `p.dep[i]`. It is a constant, not state — it used to be a "Days
 start" field in the plan header and a `S.depTime` key. Per-leg departures are
 untouched by this: tap a departure or drag the leg on the day bar.
 
+## dev/
+Not part of the site. `dev/webkit-filter-probe.html` is a standalone page that
+answers one question: does this browser apply `filter: url(#id)` to a
+*composited* element? The chart depends on it — the water is keyed out of the
+land tiles that way and the palettes are toned that way — and WebKit bars
+reference filters from the compositor, which is why the per-tile
+`@supports (-webkit-touch-callout: none)` block at the end of the stylesheet
+exists. Open it on the device if the chart ever stops toning on iOS. It used to
+be `?ft=1` inside `index.html`; it is out of the shipped page because it was
+the only part of it addressed to a developer rather than a sailor.
+
 ## Traps this file has already sprung
 Each of these cost a debugging round. They are all still live.
 

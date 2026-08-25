@@ -390,31 +390,6 @@
   .rnight { display:flex; gap:6px; align-items:center; margin-top:5px; font-size:11px; color:var(--warn-t); line-height:1.4; }
   .nightv { color:var(--warn-t); }
   .ctrl-row.tight-pair { padding-bottom:0; margin-bottom:calc(var(--space-3) * -1); }
-  .ftest { position:absolute; left:56px; top:var(--space-4); z-index:1500;
-    display:flex; align-items:center; gap:var(--space-3);
-    background:var(--color-surface); border:1px solid var(--color-divider);
-    border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); box-shadow:var(--shadow-lg); }
-  .ftest[hidden] { display:none; }
-  .ft-grid { display:grid; grid-template-columns:repeat(5,auto); gap:2px var(--space-2);
-    align-items:center; justify-items:center; flex:1 0 100%; }
-  .ft-grid b { font-size:9px; font-weight:500; color:var(--muted-2); letter-spacing:.02em; }
-  .ft-sw { display:block; width:30px; height:26px; border-radius:var(--radius-sm); background:#f00; }
-  /* 1 plain reference filter — known to work on iOS */
-  .ft-url  { filter:url(#ftGreen); }
-  /* 2 reference filter on a COMPOSITED element. If this is green, WebKit does
-       render a reference filter into a composited layer's own backing store,
-       and filtering each tile individually will work. */
-  .ft-url3d { filter:url(#ftGreen); transform:translate3d(0,0,0); }
-  /* 3 filter on the PARENT, composited child inside — the tile-pane case.
-       Expected RED: the child escapes the ancestor's software filter. */
-  .ft-par { filter:url(#ftGreen); display:block; line-height:0; }
-  .ft-kid3d { transform:translate3d(0,0,0); }
-  /* 4 control: a FUNCTION filter composites fine, so this should be green */
-  .ft-fn3d { filter:hue-rotate(120deg); transform:translate3d(0,0,0); }
-  .ft-txt { font-size:11px; color:var(--muted); line-height:1.4; max-width:210px; }
-  .ft-out { flex:1 0 100%; margin:var(--space-2) 0 0; font-size:11px; line-height:1.5;
-    color:var(--color-text); white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-  .ftest { flex-wrap:wrap; max-width:min(330px, calc(100vw - 72px)); }
   .welcome {
     position:absolute; left:56px; top:var(--space-4); z-index:640; max-width:292px;
     background:var(--color-surface); border:1px solid var(--color-divider);
@@ -1577,8 +1552,9 @@
      tile a translate3d, making each tile its own composited layer, and those
      pixels never pass through the ancestor pane's software filter — the
      declaration is honoured, the pixels escape. Measured on an iPhone with
-     ?ft=1: `child` (filter on parent, composited child) is RED, while `url+3d`
-     (the same filter ON a composited element) is GREEN. A composited layer that
+     dev/webkit-filter-probe.html on the device: `child` (filter on parent,
+     composited child) is RED, while `url+3d` (the same filter ON a composited
+     element) is GREEN. A composited layer that
      cannot composite its own filter paints it in software into its own backing,
      so moving the filter onto the tile itself works.
 
@@ -1641,11 +1617,6 @@
        relief tiles purely as a water MASK - keyLand's alpha - and flood that
        shape with the palette's own --sea, giving a genuinely flat sea laid over
        the imagery. One per palette because feFlood cannot read a CSS variable. -->
-  <!-- Diagnostic only, shown by ?ft=1. Maps red to green, so a swatch that
-       stays red proves filter: url(#id) is not being applied by the browser. -->
-  <filter id="ftGreen" color-interpolation-filters="sRGB">
-    <feColorMatrix type="matrix" values="0 0 0 0 0  1 0 0 0 0  0 0 0 0 0  0 0 0 1 0"></feColorMatrix>
-  </filter>
   <filter id="flatSeaDay" color-interpolation-filters="sRGB">
     <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -20 0 20 0 0.26" result="m"></feColorMatrix>
     <feFlood flood-color="#c9dcea"></feFlood>
@@ -1845,23 +1816,6 @@
       <div id="map"></div>
       <div class="hint" id="hint">Click the map to drop a new location · Esc to cancel</div>
       <div class="botread" id="botRead" hidden></div>
-      <!-- SVG-filter self test. The whole chart depends on filter: url(#id):
-           the water is keyed out of the land tiles that way, and the palettes are
-           toned that way. WebKit has not always applied it. Add ?ft=1 to the URL to
-           see whether this browser does. -->
-      <div class="ftest" id="ftest" hidden>
-        <div class="ft-grid">
-          <b>ctl</b><b>url</b><b>url+3d</b><b>child</b><b>fn+3d</b>
-          <span class="ft-sw ft-ctl"></span>
-          <span class="ft-sw ft-url"></span>
-          <span class="ft-sw ft-url3d"></span>
-          <span class="ft-par"><span class="ft-sw ft-kid3d"></span></span>
-          <span class="ft-sw ft-fn3d"></span>
-        </div>
-        <span class="ft-txt">all five start RED. green = the filter reached the pixels.
-        <b>url+3d</b> is the one that decides the fix.</span>
-        <pre class="ft-out" id="ftOut">reading…</pre>
-      </div>
       <div class="welcome" id="welcome" data-on="false">
         <div class="wtitle">Sail Planner</div>
         <div class="wsub">Distances, sail time and a day-by-day plan for the Southern California Bight.</div>
@@ -4998,61 +4952,6 @@ if(!lsGet('sp_welcome')) wel.dataset.on='true';
    its existence is the whole effect. */
 document.addEventListener('touchstart', ()=>{}, {passive:true});
 
-/* ?ft=1 shows the SVG-filter self test — see the note by .ftest */
-if(/[?&]ft=1\b/.test(location.search)) document.getElementById('ftest').hidden=false;
-/* Everything the chart's look depends on, read off the device rather than
-   inferred. Three separate questions that kept getting conflated: does this
-   browser apply an SVG filter at all, does it apply one to a cross-origin tile,
-   and are the tiles even reaching us CORS-clean. */
-if(/[?&]ft=1\b/.test(location.search)) setTimeout(()=>{
-  const out=document.getElementById('ftOut'); if(!out) return;
-  const L=[];
-  const paneFilter = getComputedStyle(document.querySelector('.leaflet-tile-pane')).filter;
-  L.push('pal      : '+document.documentElement.dataset.pal+'  base:'+document.documentElement.dataset.base);
-  L.push('pane css : '+(paneFilter||'none').slice(0,44));
-  const t=document.querySelector('.leaflet-tile-pane img');
-  L.push('tile attr: crossOrigin='+(t? (t.crossOrigin||'(none)') : 'no tile yet'));
-  out.textContent=L.join('\n')+'\ncanvas   : testing…';
-  if(!t){ return; }
-  /* can we read the tile back? if yes it is CORS-clean and we could filter it
-     ourselves in JS instead of asking CSS to do it */
-  const probe=new Image(); probe.crossOrigin='anonymous';
-  probe.onload=()=>{
-    let verdict;
-    try{
-      const c=document.createElement('canvas'); c.width=c.height=8;
-      const cx=c.getContext('2d'); cx.drawImage(probe,0,0,8,8);
-      cx.getImageData(0,0,1,1);
-      verdict='CLEAN (readable, JS filtering possible)';
-    }catch(e){ verdict='TAINTED ('+e.name+')'; }
-    out.textContent=L.join('\n')+'\ncanvas   : '+verdict;
-  };
-  probe.onerror=()=>{ out.textContent=L.join('\n')+'\ncanvas   : TILE FAILED TO LOAD with CORS'; };
-  probe.src=t.src;
-}, 2500);
-/* Has the visitor moved the chart themselves? Only used to decide whether
-   dismissing the welcome sheet may re-fit - re-fitting under someone who has
-   panned somewhere on purpose is worse than a route sitting a little high. */
-let mapMoved=false;
-map.on('dragstart', ()=>{ mapMoved=true; });
-map.getContainer().addEventListener('wheel', ()=>{ mapMoved=true; }, {passive:true});
-
-function dismissWelcome(){
-  if(wel.dataset.on!=='true') return;
-  wel.dataset.on='false'; lsSet('sp_welcome','1');
-  /* the fit was padded by the sheet's height; take that back now it is gone */
-  if(!mapMoved) fitAll();
-}
-document.getElementById('wgo').addEventListener('click', dismissWelcome);
-/* A sheet across the bottom of the chart should also go when you touch the
-   chart, which is the first thing anyone does. Not while a pin is being placed:
-   that tap has a job already, and re-fitting would move the chart under it. */
-map.on('click', ()=>{
-  if(narrow() && !adding) dismissWelcome();
-  /* a tap on open water is how you put a tooltip away, since there is no
-     mouseout to do it — feature taps stop before they reach here */
-  if(TOUCH_TIP) hideTip();
-});
 map.attributionControl.addAttribution('Planning only \u2014 not for navigation');
 
 const tws=document.getElementById('tws');
