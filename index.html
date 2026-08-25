@@ -981,7 +981,35 @@
        put the float beside Conditions at this width - they overlapped by 172x270
        - and fitFloat's "drop below" branch needs 230px of clearance it does not
        have here, so it is placed unconditionally instead. */
-    .float { left:48px; max-width:calc(100% - 58px - var(--safe-r)); top:60px; }
+    /* ---------------- M6: the matrix is the third dock ----------------
+       At this width it was a floating window at left:48 top:60, capped to
+       332px - pinned under the Conditions pill, flush to both edges, its
+       Distance/Time tabs scrolling sideways inside a panel over a 307px chart.
+       Measured, that left the chart 36% of the stage; as a dock it is ~55%.
+
+       mxHome() moves the element out of .map-wrap and into .stage below this
+       width, so it becomes the last child of the same flex column the other two
+       docks live in. Nothing is duplicated and the matrix is not re-rendered -
+       #mxWrap goes with it. Above 720px it moves back and is the float it was.
+
+       Everything below un-does the float: the positioning, the window chrome
+       and the caps. fitFloat's inline top and max-width are cleared by mxHome,
+       or they would outrank all of this. */
+    .float {
+      position:static; order:9; flex:none;
+      left:auto; top:auto; max-width:none; max-height:none;
+      border:0; border-top:1px solid var(--line); border-radius:0;
+      box-shadow:none; backdrop-filter:none; background:var(--color-bg);
+    }
+    /* the header becomes a drawer-top: same padding, same drag-to-resize
+       cursor, and the tabs sit on the row rather than floating right */
+    .float-h {
+      padding:var(--space-3) var(--space-6); cursor:ns-resize; user-select:none;
+      gap:var(--space-2); border-bottom:0;
+    }
+    .float-h .float-sub { display:none; }
+    .float-h .seg { margin-left:auto; }
+    .float-b { padding:0 var(--space-6) calc(var(--space-6) + var(--safe-b)); }
     .drawer-b { max-height:52vh; }
     .ctrls { right:calc(var(--space-3) + var(--safe-r)); top:calc(var(--space-3) + var(--safe-t)); }
     /* above the sidebar overlay (1300), or the instruction sits behind it */
@@ -2146,7 +2174,7 @@ const HUES=[190,285,105,225,60];
 const S = Object.assign({
   locs: SEED.map(l=>({...l, on:true})),
   mode:'dist', mxMode:'dist', unit:'nm', legsView: FRESH?'route':'all', pal:'dusk', spd:6, tack:true, wdir:293, tws:12,
-  route: FRESH?[...DEMO]:[], drawer:false, planOpen:false, plans: FRESH?{r1:{start:DEMO_START, days:[], dep:{}}}:{}, clock24:true, tides:false, mxOpen:false, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
+  route: FRESH?[...DEMO]:[], drawer:false, planOpen:false, plans: FRESH?{r1:{start:DEMO_START, days:[], dep:{}}}:{}, clock24:true, tides:false, mxOpen:false, mh:null, tab:'matrix', collapsed:false, ctrls:true, depth:'off', marks:false, topo:false, base:'streets',
   routes:[{id:'r1', name: FRESH?'Island loop':'Route 1', hue:HUES[0], stops: FRESH?[...DEMO]:[]}],
   activeRoute:'r1', shown:['r1'], baseline:'r1'
 }, (()=>{ try{ return JSON.parse(lsGet())||{}; }catch(e){ return {}; } })());
@@ -4721,31 +4749,104 @@ const dockRoom = () =>
 /* Opening a dock still leaves the chart a usable share — a dock nobody has
    touched grows to its content but no further than this. Only a deliberate
    resize (drag, or double-click to fit) is allowed past it, up to availBody. */
+/* ---------------- the docks, as a set ----------------
+   There are three: compare, plan, and — below 720px only — the matrix, which
+   is a floating window above that width and does not count as a dock there.
+   These accessors exist so defaultBody, availBody and fitToContent can be
+   written over "the docks that are open" instead of naming two of them, which
+   is what made adding a third a rewrite rather than an entry. */
+const narrow = () => window.matchMedia('(max-width:720px)').matches;
+const mxIsDock = () => narrow();
+const DOCK_KEYS = ['cmp','plan','mx'];
+const dockOpen = k => k==='plan'? !!S.planOpen : k==='cmp'? !!S.drawer : (!!S.mxOpen && mxIsDock());
+const openDocks = () => DOCK_KEYS.filter(dockOpen);
+const dockHead = k => k==='plan'? planTop : k==='cmp'? drawerTop : mxFloat.querySelector('.float-h');
+const dockBody = k => k==='plan'? planDock.querySelector('.drawer-b')
+                    : k==='cmp' ? drawer.querySelector('.drawer-b')
+                                : mxFloat.querySelector('.float-b');
+const dockPane = k => k==='plan'? document.getElementById('panePlan')
+                    : k==='cmp' ? document.getElementById('paneCompare')
+                                : mxFloat.querySelector('.float-b');
+const dockSize = k => k==='plan'? S.ph : k==='cmp'? S.dh : S.mh;
+const setDockSize = (k,v) => { if(k==='plan') S.ph=v; else if(k==='cmp') S.dh=v; else S.mh=v; };
+const dockBtn  = k => document.getElementById(k==='plan'? 'planBtn' : k==='cmp'? 'cmpBtn' : 'mxBtn');
+
 function defaultBody(){
   const stage=document.querySelector('.stage').clientHeight;
-  const n=(S.drawer?1:0)+(S.planOpen?1:0);
+  const open=openDocks(), n=open.length;
   if(!n) return 0;
-  const heads=40*n;
-  return Math.min((stage-190-heads)/n, (stage-heads)*(n>1? 0.28 : 0.52));
+  /* measured, not 40px each. On a phone a dock header is ~63px once its
+     controls are finger-sized, and the estimate is what put the chart at 43%
+     of the stage against a 45% floor. */
+  const heads=open.reduce((a,k)=>a+dockHead(k).offsetHeight, 0);
+  /* The chart keeps 45% of the stage at a dock's default size - stated, rather
+     than implied by the 0.52 and a guessed header height. Phone only: on a
+     desktop the docks sit beside a much larger chart and this floor would
+     shorten their defaults by ~22px for no reason anyone asked for. */
+  const keeps45 = narrow()? (stage*0.55 - heads)/n : Infinity;
+  return Math.max(110, Math.min((stage-190-heads)/n, (stage-heads)*(n>1? 0.28 : 0.52), keeps45));
 }
 
 /* The tallest this dock's body may be, with the headers already taken out. */
 function availBody(self){
-  const n=(S.drawer?1:0)+(S.planOpen?1:0);
-  if(!n) return 0;
+  const open=openDocks();
+  if(!open.length) return 0;
   const room=dockRoom();
-  const myHead=(self==='plan'? planTop : drawerTop).offsetHeight;
-  if(n<2) return Math.max(110, room - myHead);
-  const otherHead=(self==='plan'? drawerTop : planTop).offsetHeight;
-  const otherWant=(self==='plan'? S.dh : S.ph);
-  const mySet    =(self==='plan'? S.ph : S.dh);
-  /* Both open. The other dock keeps whatever size it was given; failing that the
-     two split the room evenly — unless THIS one has been deliberately sized, in
-     which case the other yields to its minimum so the drag has somewhere to go.
+  const myHead=dockHead(self).offsetHeight;
+  const others=open.filter(k=>k!==self);
+  if(!others.length) return Math.max(110, room - myHead);
+  /* Others open too. Each keeps whatever size it was given; failing that they
+     split the room evenly — unless THIS one has been deliberately sized, in
+     which case they yield to their minimum so the drag has somewhere to go.
      Without that last clause a deliberate drag still stops at half the stage,
      which is the same complaint one level down. */
-  const otherBody=otherWant || (mySet? 110 : Math.max(110, (room - myHead - otherHead)/2));
-  return Math.max(110, room - myHead - otherHead - otherBody);
+  let left = room - myHead - others.reduce((a,k)=>a+dockHead(k).offsetHeight, 0);
+  const mySet = dockSize(self);
+  const share = mySet? 110 : Math.max(110, left/(others.length+1));
+  others.forEach(k=>{ left -= (dockSize(k) || share); });
+  return Math.max(110, left);
+}
+
+/* Below 720px exactly one dock is open. Closing the others by state and button
+   rather than by calling their setters, because those call back into here. */
+function closeOtherDocks(keep){
+  if(!narrow()) return;
+  DOCK_KEYS.filter(k=>k!==keep && dockOpen(k)).forEach(k=>{
+    rememberScroll(k);
+    if(k==='plan') S.planOpen=false; else if(k==='cmp') S.drawer=false; else S.mxOpen=false;
+    dockBtn(k).setAttribute('aria-pressed', false);
+  });
+}
+
+/* display:none is what a closed dock is, and it does not promise to keep a
+   scroll position across it. Reopening one you had scrolled halfway down and
+   landing back at the top is the kind of thing that reads as a lost edit. */
+function rememberScroll(k){ const p=dockPane(k); if(p) p.dataset.st=p.scrollTop; }
+function restoreScroll(k){
+  const p=dockPane(k); if(!p||!p.dataset.st) return;
+  /* Synchronous, with a forced reflow first. Callers run this straight after
+     fitDocks(), so the fitted max-height is set but not yet applied - and until
+     it is, the pane has no scroll range and assigning scrollTop writes 0.
+     Reading offsetHeight flushes that pending layout. Not rAF: this has to
+     work whether or not a frame is ever painted. */
+  void p.offsetHeight;
+  p.scrollTop=+p.dataset.st;
+}
+
+/* The matrix is one element in two places: a floating window inside .map-wrap
+   above 720px, and the last child of .stage — a dock in the same flex column as
+   the other two — below it. Moving the element rather than duplicating it keeps
+   #mxWrap, so the table is not re-rendered and its scroll survives the move.
+   fitFloat leaves an inline top and max-width behind; those outrank the dock
+   CSS, so they go with it. */
+function mxHome(){
+  const want = mxIsDock()? document.querySelector('.stage') : document.querySelector('.map-wrap');
+  if(mxFloat.parentNode === want) return;
+  want.appendChild(mxFloat);
+  mxFloat.style.removeProperty('top');
+  mxFloat.style.removeProperty('max-width');
+  const b=mxFloat.querySelector('.float-b');
+  b.style.removeProperty('max-height');
 }
 function setPlan(on){
   /* the docks sit under the sidebar overlay at phone width, so opening one
@@ -4756,12 +4857,14 @@ function setPlan(on){
     S.collapsed=true; appEl.dataset.collapsed='true';
   }
   S.planOpen=!!on;
+  if(S.planOpen) closeOtherDocks('plan'); else rememberScroll('plan');
   document.getElementById('planBtn').setAttribute('aria-pressed', S.planOpen);
   if(S.planOpen) renderPlan();
-  fitPlan(); fitDrawer(); save();
+  fitDocks(); save();
+  if(S.planOpen) restoreScroll('plan');
   /* the float sizes itself against the free chart height, so it has to re-fit
      when a dock takes some of it — setCompare already does this */
-  requestAnimationFrame(()=>{ map.invalidateSize({pan:false}); fitPlan(); fitDrawer(); if(S.mxOpen) fitFloat(); });
+  requestAnimationFrame(()=>{ map.invalidateSize({pan:false}); fitDocks(); });
 }
 function fitPlan(){
   const b=planDock.querySelector('.drawer-b');
@@ -4823,14 +4926,26 @@ planTop.addEventListener('pointerdown', e=>{
    than the room available it takes all of it and still scrolls; there is
    nowhere else for the height to come from. */
 function fitToContent(self){
-  const paneId = self==='plan'? 'panePlan' : 'paneCompare';
-  const need = document.getElementById(paneId).scrollHeight + 10;
+  const need = dockPane(self).scrollHeight + 10;
   /* claim the size before measuring, so availBody counts this dock as one the
      user has deliberately sized and hands back the larger ceiling */
-  if(self==='plan') S.ph=need; else S.dh=need;
-  const h = Math.max(110, Math.min(need, availBody(self)));
-  if(self==='plan') S.ph=h; else S.dh=h;
-  fitPlan(); fitDrawer(); map.invalidateSize({pan:false}); save();
+  setDockSize(self, need);
+  setDockSize(self, Math.max(110, Math.min(need, availBody(self))));
+  fitDocks(); map.invalidateSize({pan:false}); save();
+}
+/* every dock re-fits whenever any of them changes, because availBody is a
+   function of all of them */
+function fitDocks(){ fitPlan(); fitDrawer(); fitMatrix(); }
+
+/* The matrix in dock mode. fitFloat still owns it as a window above 720px. */
+function fitMatrix(){
+  if(!mxIsDock()){ if(S.mxOpen) fitFloat(); return; }
+  const b=mxFloat.querySelector('.float-b');
+  mxFloat.dataset.open = S.mxOpen? 'true':'false';
+  if(!S.mxOpen){ b.style.maxHeight=''; return; }
+  const need=b.scrollHeight+10;
+  const cap = S.mh!=null? availBody('mx') : Math.min(availBody('mx'), defaultBody());
+  b.style.maxHeight = Math.max(110, Math.min(S.mh||need, cap)) + 'px';
 }
 planTop.addEventListener('dblclick', e=>{
   if(!S.planOpen || e.target.closest('button, .seg, input, label')) return;
@@ -4923,15 +5038,22 @@ function setMatrix(on){
      aria-expanded and the collapsed summary text) and none of the set* helpers
      call it. setPlan and setCompare had the same gap with data-collapsed. If
      you change S.<something> in here, make sure something applies it. */
-  const collapseCtrls = on && window.matchMedia('(max-width:720px)').matches && S.ctrls!==false;
+  /* As a dock it no longer sits on top of Conditions, so it no longer has to
+     close it — that was the float's overlap, not the matrix's. */
+  const collapseCtrls = on && narrow() && !mxIsDock() && S.ctrls!==false;
   if(collapseCtrls) S.ctrls=false;
+  /* a dock lives under the sidebar overlay at this width, same as the other two */
+  if(on && mxIsDock() && !S.collapsed){ S.collapsed=true; appEl.dataset.collapsed='true'; }
   S.mxOpen=!!on;
-  if(S.mxOpen && S.drawer) setCompare(false);      // one surface at a time over the chart
+  if(S.mxOpen) closeOtherDocks('mx'); else rememberScroll('mx');
+  if(S.mxOpen && S.drawer && !mxIsDock()) setCompare(false);   // one surface at a time over the chart
   mxFloat.dataset.open = S.mxOpen? 'true':'false';
   document.getElementById('mxBtn').setAttribute('aria-pressed', S.mxOpen);
-  if(S.mxOpen) fitFloat();
+  fitDocks();
+  if(S.mxOpen) restoreScroll('mx');
   save();
   if(collapseCtrls) all();
+  requestAnimationFrame(()=>{ map.invalidateSize({pan:false}); fitDocks(); });
 }
 function setCompare(on){
   if(on && window.matchMedia('(max-width:720px)').matches && !S.collapsed){
@@ -4940,18 +5062,22 @@ function setCompare(on){
     S.collapsed=true; appEl.dataset.collapsed='true';
   }
   S.drawer=!!on;
-  if(S.drawer && S.mxOpen){ S.mxOpen=false; mxFloat.dataset.open='false'; document.getElementById('mxBtn').setAttribute('aria-pressed',false); }
+  if(S.drawer) closeOtherDocks('cmp'); else rememberScroll('cmp');
+  /* above 720px the matrix is a window over the chart, and it lands on the
+     compare dock; below, closeOtherDocks has already dealt with it */
+  if(S.drawer && S.mxOpen && !mxIsDock()){ S.mxOpen=false; mxFloat.dataset.open='false'; document.getElementById('mxBtn').setAttribute('aria-pressed',false); }
   document.getElementById('cmpBtn').setAttribute('aria-pressed', S.drawer);
-  fitDrawer(); fitPlan(); save();
-  requestAnimationFrame(()=>{ fitDrawer(); fitPlan(); if(S.mxOpen) fitFloat(); });
+  fitDocks(); save();
+  if(S.drawer) restoreScroll('cmp');
+  requestAnimationFrame(()=>{ fitDocks(); });
   setTimeout(()=>map.invalidateSize(),200);
 }
 /* the float grows to its table, capped to the chart it floats over */
 function fitFloat(){
   /* the phone layout places this in CSS; an inline top from the branch below
      would override it and put the float back under the Conditions pill */
-  const narrow = window.matchMedia('(max-width:720px)').matches;
-  if(narrow) mxFloat.style.top='';
+  const isNarrow = narrow();
+  if(isNarrow) mxFloat.style.top='';
   const b=mxFloat.querySelector('.float-b');
   const mw=document.querySelector('.map-wrap');
   const mwR=mw.getBoundingClientRect();
@@ -4962,7 +5088,7 @@ function fitFloat(){
   const sideRoom=c.left-10-fR.left, fullRoom=mwR.right-8-fR.left;
   /* if the table can't fit beside the Conditions panel, drop below it and take
      the full chart width instead of scrolling sideways */
-  if(!narrow && !mxMoved && need>sideRoom && fullRoom>sideRoom && mw.clientHeight-(c.bottom-mwR.top) > 230){
+  if(!isNarrow && !mxMoved && need>sideRoom && fullRoom>sideRoom && mw.clientHeight-(c.bottom-mwR.top) > 230){
     mxFloat.style.top = (c.bottom-mwR.top+18)+'px';
     fR=mxFloat.getBoundingClientRect();
   }
@@ -4980,6 +5106,31 @@ function drawerBar(){
   document.getElementById('cmpSub').textContent =
     `${shownRoutes().filter(r=>stopsOf(r.id).length>1).length} routes shown`;
 }
+/* Dock mode gets the two affordances the other docks have. Above 720px this
+   header is the float's drag-to-move handle, so both are gated on mxIsDock. */
+const mxTop = mxFloat.querySelector('.float-h');
+mxTop.addEventListener('dblclick', e=>{
+  if(!S.mxOpen || !mxIsDock() || e.target.closest('button, .seg, input, label')) return;
+  fitToContent('mx');
+});
+mxTop.addEventListener('pointerdown', e=>{
+  if(!S.mxOpen || !mxIsDock() || e.target.closest('button, .seg, input, label')) return;
+  const b=mxFloat.querySelector('.float-b');
+  const startY=e.clientY, startH=b.clientHeight;
+  mxTop.setPointerCapture(e.pointerId);
+  const move=ev=>{
+    if(S.mh==null) S.mh=startH;                   // deliberately sized from here on
+    S.mh=Math.max(90, Math.min(startH+(startY-ev.clientY), availBody('mx')));
+    b.style.maxHeight=S.mh+'px'; map.invalidateSize({pan:false});
+  };
+  const up=()=>{
+    mxTop.removeEventListener('pointermove',move);
+    mxTop.removeEventListener('pointerup',up);
+    save(); fitMatrix();
+  };
+  mxTop.addEventListener('pointermove',move);
+  mxTop.addEventListener('pointerup',up);
+});
 document.getElementById('mxBtn').addEventListener('click', ()=>{ setMatrix(!S.mxOpen); });
 document.getElementById('mxClose').addEventListener('click', ()=>setMatrix(false));
 document.getElementById('cmpBtn').addEventListener('click', ()=>setCompare(!S.drawer));
@@ -5066,7 +5217,13 @@ new ResizeObserver(()=>{
     fitAll();
   }
 }).observe(document.querySelector('.map-wrap'));
-window.addEventListener('resize', ()=>{ map.invalidateSize({pan:false}); fitDrawer(); fitPlan(); });
+window.addEventListener('resize', ()=>{
+  /* crossing 720px changes what the matrix IS, so it has to move before
+     anything measures it */
+  mxHome();
+  map.invalidateSize({pan:false});
+  fitDocks();
+});
 document.getElementById('fitAll').addEventListener('click', fitAll);
 /* Fit the compare drawer to its table: squeeze it before showing a horizontal
    scrollbar, and grow the height so it needs no vertical scroll (chart keeps 160px). */
@@ -5364,12 +5521,19 @@ function all(){
   document.getElementById('windCtl').style.pointerEvents=S.tack?'auto':'none';
   sidebar(); draw(); save();
   if(S.depth!==lastDepth || S.marks!==lastMarks || S.topo!==lastTopo){ lastDepth=S.depth; lastMarks=S.marks; lastTopo=S.topo; setDepth(); }
-  fitDrawer();
   if(S.planOpen) renderPlan();
-  fitPlan();
-  if(S.mxOpen) fitFloat();
-  requestAnimationFrame(()=>{ fitDrawer(); fitPlan(); map.invalidateSize({pan:false}); });
+  fitDocks();
+  requestAnimationFrame(()=>{ fitDocks(); map.invalidateSize({pan:false}); });
 }
+
+/* Boot. mxHome first, because whether the matrix is a dock decides how many
+   docks are open, which is what every size below is a function of. And a blob
+   saved on a desktop can carry two or three of them open — at this width that
+   is the state one-dock-at-a-time exists to prevent, so it is resolved on load
+   rather than left for the first tap to sort out. Priority is the order in
+   DOCK_KEYS reversed: the plan is the one you were most likely reading. */
+mxHome();
+if(narrow() && openDocks().length>1) closeOtherDocks(S.planOpen? 'plan' : S.drawer? 'cmp' : 'mx');
 all();
 setTimeout(()=>{ map.invalidateSize({pan:false}); if(!fitted){ fitted=true; fitAll(); } }, 350);
 </script>

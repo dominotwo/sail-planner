@@ -78,17 +78,39 @@ MapTiler dashboard and override it via `window.SAIL_CONFIG.maptilerKey` in
 `config.js`. Never add a service that needs a *secret* key without introducing
 a server-side proxy first.
 
-## Dock sizing
-Three ceilings, and they must agree or a drag springs back on release:
-`defaultBody()` is how far a dock nobody has touched may grow (a share of the
-stage, so opening one leaves the chart usable). `availBody(self)` is how far a
-*deliberately* sized dock may go — bounded only by `MIN_CHART` and by what the
-other dock is using; if this dock has an explicit size the other yields to its
-minimum. `S.ph` / `S.dh` hold the explicit sizes and being non-null is what marks
-a dock as deliberately sized, so anything that sets a size must set it *before*
-calling `availBody`. Both drag handlers and `fitToContent()` clamp with
-`availBody`, which is the same ceiling `fitPlan` / `fitDrawer` re-apply on
-release.
+## Docks
+**There are three**: compare, plan, and — below 720px only — the matrix. Above
+that width the matrix is a floating window inside `.map-wrap` and is *not* a
+dock; `mxHome()` moves the same element into `.stage` when the breakpoint is
+crossed, so nothing is duplicated and `#mxWrap` is never re-rendered.
+
+Everything is written over `openDocks()` rather than naming two of them:
+`dockOpen/dockHead/dockBody/dockPane/dockSize/dockBtn` take a key of
+`'cmp' | 'plan' | 'mx'`. Add a fourth and these are the only accessors to touch.
+
+**Below 720px exactly one is open.** `closeOtherDocks(keep)` does it by state
+and button, not by calling the other setters — those call back into it.
+
+**Three ceilings, and they must agree or a drag springs back on release.**
+`defaultBody()` is how far a dock nobody has touched may grow: a share of the
+stage, capped on a phone so the chart keeps 45% of it. `availBody(self)` is how
+far a *deliberately* sized dock may go — bounded only by `MIN_CHART` and by what
+the others are using; if this dock has an explicit size the others yield to
+their minimum. `S.ph` / `S.dh` / `S.mh` hold the explicit sizes and being
+non-null is what marks a dock as deliberately sized, so anything that sets a
+size must set it *before* calling `availBody`. Both drag handlers and
+`fitToContent()` clamp with `availBody`, the same ceiling `fitDocks()` re-applies
+on release. `fitDocks()` fits all three, because `availBody` is a function of
+all of them.
+
+Header heights are **measured**, not assumed to be 40px — a phone dock header is
+~63px once its controls are finger-sized, and the estimate is what put the chart
+at 43% against a 45% floor.
+
+Closing a dock is `display:none`, which does not keep a scroll position.
+`rememberScroll`/`restoreScroll` carry it, synchronously with a forced reflow —
+not in `requestAnimationFrame`, which runs before layout, so the pane has no
+scroll range yet and the assignment writes 0.
 
 ## When you change the plan panel
 The day bar is a fixed 24-hour scale: x = hour/24. The axis (`.pscale`), the
