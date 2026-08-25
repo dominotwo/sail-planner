@@ -976,6 +976,43 @@
     .loc-chk::after   { content:""; position:absolute; inset:-5px; }   /* 16px box -> 26px target */
     .rt-eye::after    { content:""; position:absolute; inset:-6px -4px; }
   }
+
+  /* ---------------- WebKit: filter the tiles, not the pane ----------------
+     WebKit bars any filter list containing a url() reference from the
+     CoreAnimation compositor (RenderLayerBacking::updateFilters), so a
+     reference filter only runs in the software paint path. Leaflet gives every
+     tile a translate3d, making each tile its own composited layer, and those
+     pixels never pass through the ancestor pane's software filter — the
+     declaration is honoured, the pixels escape. Measured on an iPhone with
+     ?ft=1: `child` (filter on parent, composited child) is RED, while `url+3d`
+     (the same filter ON a composited element) is GREEN. A composited layer that
+     cannot composite its own filter paints it in software into its own backing,
+     so moving the filter onto the tile itself works.
+
+     Gated, because Chrome does not need this and regresses with it: filtering
+     each tile there leaves persistent tile-aligned bands that survive a full
+     settle. @supports (-webkit-touch-callout:none) matches iOS and nothing else.
+
+     Every filter here is pointwise — colour matrices and transfer functions, no
+     blur — so per-tile is pixel-equivalent to per-pane. That equivalence is what
+     makes this safe; do not add a spatial filter to these chains.
+
+     Note leaflet.css sets `.leaflet-tile { filter: inherit }`, which inherits
+     from .leaflet-tile-container (none), not from the pane — so it does not do
+     this job for us. These rules outrank it on specificity. */
+  @supports (-webkit-touch-callout: none) {
+    .leaflet-tile-pane { filter:none; }
+    .leaflet-tile-pane .leaflet-tile { filter: var(--tile); }
+
+    .leaflet-depth-pane { filter:none; }
+    .leaflet-depth-pane .leaflet-tile { filter: var(--tile-depth, none); }
+    :root[data-base="sat"][data-depth="off"][data-pal="day"]   .leaflet-depth-pane .leaflet-tile { filter:url(#flatSeaDay); }
+    :root[data-base="sat"][data-depth="off"][data-pal="dusk"]  .leaflet-depth-pane .leaflet-tile { filter:url(#flatSeaDusk); }
+    :root[data-base="sat"][data-depth="off"][data-pal="night"] .leaflet-depth-pane .leaflet-tile { filter:url(#flatSeaNight); }
+    :root[data-base="sat"][data-depth="contour"] .leaflet-depth-pane .leaflet-tile {
+      filter: url(#keyLand) var(--tile-depth, brightness(1));
+    }
+  }
 </style>
 </head>
 <body>
