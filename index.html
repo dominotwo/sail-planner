@@ -2750,10 +2750,13 @@ function arrowAt(geo, frac, col){
       +'</svg></div>'
   })}));
 }
+/* Set by a leg's tap and consumed by the draw() that same tap triggers. */
+let tapTipAt=null, tapTipLine=null;
 function draw(){
   refreshCodes();
   legLayer.clearLayers(); lblLayer.clearLayers(); pinLayer.clearLayers();
   legPaths.length=0; if(hlLayer){ hlLayer.clearLayers(); }
+  tapTipLine=null;
   const L2 = legs();
   const vals = L2.map(metric);
   const lo = vals.length? Math.min(...vals):0, hi = vals.length? Math.max(...vals):1;
@@ -2811,10 +2814,16 @@ function draw(){
     const hitLine = L.polyline(geo,{
       color:col, weight:18, opacity:0, lineCap:'round', smoothFactor:0, interactive:true
     }).bindTooltip(tip(l,users),{sticky:true});
+    if(tapTipAt && tapTipAt.lk===lk) tapTipLine=hitLine;
     hitLine.on('click', ev=>{
       L.DomEvent.stopPropagation(ev);
       S.selLeg = selLeg? null : lk;
       S.hl = selLeg? null : l.A.id;
+      /* draw() clears every layer and builds new ones, so the tooltip Leaflet
+         opens on this same tap is thrown away with the polyline it was
+         attached to. The tap point is kept and the tooltip re-opened on the
+         line that replaces this one. */
+      tapTipAt = (TOUCH_TIP && S.selLeg)? {lk:S.selLeg, latlng:ev.latlng} : null;
       draw(); save();
     });
     hitLine.on('dblclick', ev=>{
@@ -2890,6 +2899,9 @@ function draw(){
   document.getElementById('legFor').textContent = arOn? ar.name : '';
   document.getElementById('rMin').textContent = vals.length? (S.mode==='dist'? distLbl({d:lo}.d)+' '+unitTxt() : hm(lo)) : '—';
   document.getElementById('rMax').textContent = vals.length? (S.mode==='dist'? distLbl(hi)+' '+unitTxt() : hm(hi)) : '';
+  /* the leg tapped a moment ago was rebuilt by this very call, so its tooltip
+     goes on the line that replaced it — see the click handler above */
+  if(tapTipLine){ showTip(tapTipLine, tapTipAt.latlng); tapTipLine=null; tapTipAt=null; }
   matrix(L2);
 }
 function midOf(pts, frac){
@@ -3394,6 +3406,7 @@ async function atonRefresh(){
     const m=L.circleMarker([c[1],c[0]],{pane:'marks', radius:r, color:halo, weight:1.5,
       opacity:.9, fillColor:col, fillOpacity:1});
     m.bindTooltip(tip,{direction:'top', className:'leg-tip', sticky:true});
+    tapToTip(m);
     atonLayer.addLayer(m);
   });
 }
@@ -4006,7 +4019,34 @@ function spot(lat,lon,col,r){
   return L.circleMarker([lat,lon],{pane:'spots', radius:r, color:col, weight:2,
     fillColor:col, fillOpacity:.35});
 }
-function bindTip(layer, html){ layer.bindTooltip(html,{sticky:true, direction:'top', opacity:1}); }
+/* On a pointer device Leaflet opens a tooltip on mouseover and closes it on
+   mouseout. A finger has neither, so on touch the tap opens it explicitly and
+   the next tap on open water closes it. Leaflet does bind click->open itself,
+   but only reliably where nothing else handles the same tap - the legs redraw
+   on theirs, which throws the tooltip away with the layer it was attached to. */
+const TOUCH_TIP = window.matchMedia('(hover:none)').matches;
+let openTip=null;
+function showTip(layer, latlng){
+  if(openTip && openTip!==layer && openTip.closeTooltip) openTip.closeTooltip();
+  layer.openTooltip(latlng);
+  openTip=layer;
+}
+function hideTip(){ if(openTip){ if(openTip.closeTooltip) openTip.closeTooltip(); openTip=null; } }
+function tapToTip(layer){
+  if(!TOUCH_TIP) return layer;
+  /* stopPropagation so the map's own click does not immediately close what this
+     one just opened - the map handler below is what dismisses it, and it should
+     only fire for a tap that missed everything */
+  layer.on('click', e=>{
+    if(adding) return;                 // that tap is placing a pin, not asking a question
+    L.DomEvent.stopPropagation(e); showTip(layer, e.latlng);
+  });
+  return layer;
+}
+function bindTip(layer, html){
+  layer.bindTooltip(html,{sticky:true, direction:'top', opacity:1});
+  return tapToTip(layer);
+}
 
 /* ---------------- seabed raster ----------------
    One elevation source answers three questions: how deep is it here, how steep
@@ -4956,7 +4996,12 @@ document.getElementById('wgo').addEventListener('click', dismissWelcome);
 /* A sheet across the bottom of the chart should also go when you touch the
    chart, which is the first thing anyone does. Not while a pin is being placed:
    that tap has a job already, and re-fitting would move the chart under it. */
-map.on('click', ()=>{ if(narrow() && !adding) dismissWelcome(); });
+map.on('click', ()=>{
+  if(narrow() && !adding) dismissWelcome();
+  /* a tap on open water is how you put a tooltip away, since there is no
+     mouseout to do it — feature taps stop before they reach here */
+  if(TOUCH_TIP) hideTip();
+});
 map.attributionControl.addAttribution('Planning only \u2014 not for navigation');
 
 const tws=document.getElementById('tws');
