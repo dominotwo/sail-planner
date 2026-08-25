@@ -1255,7 +1255,12 @@
     .pcols { display:none; }
     .pleg {
       display:flex; flex-wrap:wrap; align-items:center;
-      gap:var(--space-1) var(--space-3); padding:var(--space-2) 0;
+      /* column gap is --space-2, not --space-3. Line 2 - the steps, the time
+         field, the arrival and the duration - comes to 283px, and the 7px of
+         right padding the pane needs for the day button's overhang left 286.
+         At 8.4px gaps that is 288.8 and the duration wrapped to a third line;
+         at 5.6 it fits with 3px to spare. */
+      gap:var(--space-1) var(--space-2); padding:var(--space-2) 0;
     }
     /* the grip shares the first line with the name rather than sitting alone on
        one of its own: 100% basis pushed everything else off, including it */
@@ -1303,15 +1308,16 @@
        and it fits on one line. The wrap stays as a floor for a narrower phone. */
     .phead { flex-wrap:wrap; row-gap:var(--space-2); }
     /* the date plus sun and moon times do not fit one line at 360px */
-    /* The moonrise and moonset times are what pushed the day actions onto a
-       second line here. The phase glyph stays - it is the part you read at a
-       glance - and the exact times remain in the title. With them gone the date,
-       the sun times, the moon and the +/x all fit one line. */
-    .pday-moont { display:none; }
+    /* The whole sun/moon group goes on a phone: the sunrise-sunset pair, the
+       phase glyph and the moonrise/moonset times with it. Every bit of it is
+       already drawn on the day bar six pixels below - the daylight band, the
+       sun markers and the moon markers - so in the header it was a caption for
+       a picture you can see. The day header is the date and its actions now.
+       Desktop keeps them: there is room, and no reason to take them away. */
+    .pday-sky { display:none; }
     /* The day's +/x pair is 94px of the 293 now, which put the date, the sun
        times and the actions 6px over one line. Both gaps tighten. */
     .pday-h { flex-wrap:wrap; row-gap:var(--space-1); gap:var(--space-2); }
-    .pday-sky { gap:var(--space-2); }
     /* The note is 58px of a 482px dock - a third of everything above the first
        day. The second sentence goes: dragging a leg along the day bar is the
        finer of the two gestures and the harder to do with a thumb, and the
@@ -5113,15 +5119,32 @@ function setPlan(on){
      when a dock takes some of it — setCompare already does this */
   requestAnimationFrame(()=>{ map.invalidateSize({pan:false}); fitDocks(); });
 }
+/* Measuring a dock costs its pane's scroll position. Each fit sets the body's
+   max-height to none so it can read the natural content height, and for that
+   moment the pane is not a scroller at all - the browser drops scrollTop to 0
+   and the px value going back does not bring it home. So nudging a departure
+   by 15 minutes threw you back to day one.
+   These two carry it across. The reflow is forced before the assignment
+   because until the new max-height is applied there is no scroll range to
+   assign into, and the write lands on 0. */
+function holdScroll(k){ const p=dockPane(k); return p? p.scrollTop : 0; }
+function releaseScroll(k, top){
+  if(!top) return;
+  const p=dockPane(k); if(!p) return;
+  void p.offsetHeight;
+  p.scrollTop=top;
+}
 function fitPlan(){
   const b=planDock.querySelector('.drawer-b');
   if(!b) return;
   planDock.dataset.open = S.planOpen? 'true':'false';
   if(!S.planOpen){ b.style.maxHeight=''; return; }
+  const top=holdScroll('plan');
   b.style.maxHeight='none';
   const need=document.getElementById('panePlan').scrollHeight + 10;
   const cap = S.ph!=null? availBody('plan') : Math.min(availBody('plan'), defaultBody());
   b.style.maxHeight = Math.max(110, Math.min(S.ph||need, cap)) + 'px';
+  releaseScroll('plan', top);
 }
 document.getElementById('planBtn').addEventListener('click', ()=>setPlan(!S.planOpen));
 document.getElementById('clockSeg').querySelectorAll('input').forEach(inp=>{
@@ -5190,9 +5213,11 @@ function fitMatrix(){
   const b=mxFloat.querySelector('.float-b');
   mxFloat.dataset.open = S.mxOpen? 'true':'false';
   if(!S.mxOpen){ b.style.maxHeight=''; return; }
+  const top=holdScroll('mx');
   const need=b.scrollHeight+10;
   const cap = S.mh!=null? availBody('mx') : Math.min(availBody('mx'), defaultBody());
   b.style.maxHeight = Math.max(110, Math.min(S.mh||need, cap)) + 'px';
+  releaseScroll('mx', top);
 }
 planTop.addEventListener('dblclick', e=>{
   if(!S.planOpen || e.target.closest('button, .seg, input, label')) return;
@@ -5492,6 +5517,7 @@ function fitDrawer(){
   drawer.dataset.open = S.drawer? 'true':'false';
   drawerBar();
   if(!S.drawer){ b.style.maxHeight=''; return; }
+  const top=holdScroll('cmp');
   b.style.maxHeight='none';
   drawer.classList.remove('compact');
   const pc=document.getElementById('paneCompare');
@@ -5506,6 +5532,7 @@ function fitDrawer(){
   const need=Math.max(60, ...panes.map(p=>p.scrollHeight)) + 10;
   const cap = S.dh!=null? availBody('cmp') : Math.min(availBody('cmp'), defaultBody());
   b.style.maxHeight = Math.max(110, Math.min(S.dh||need, cap)) + 'px';
+  releaseScroll('cmp', top);
 }
 /* ---------------- plan by day ----------------
    A route says where; the plan says when. Days are the spine: the route's legs
@@ -5652,11 +5679,20 @@ function tideBar(d){
 function renderPlan(){
   const body=document.getElementById('planBody');
   if(!body) return;
+  /* Every edit in here re-renders the whole panel by replacing innerHTML, and
+     that resets the pane's scroll to the top - so nudging a departure by 15
+     minutes threw you back to day one. The scroll is put back afterwards, with
+     a forced reflow first: until the new content is laid out the pane has no
+     scroll range and the assignment writes 0. */
+  const pane=document.getElementById('panePlan');
+  const keepTop=pane? pane.scrollTop : 0;
+  const restore=()=>{ if(pane && keepTop){ void pane.offsetHeight; pane.scrollTop=keepTop; } };
   const r=activeRt();
   const sub=document.getElementById('planSub');
   if(!r || stopsOf(r.id).length<2){
     body.innerHTML='<div class="route-empty">Build a route of two or more stops, then it lands here as one day per leg.</div>';
     if(sub) sub.textContent='';
+    restore();
     return;
   }
   const S2=planSchedule(r.id);
@@ -5748,6 +5784,7 @@ function renderPlan(){
   if(sub) sub.textContent = days.length+' day'+(days.length===1?'':'s')
     + ' \u00b7 '+distLbl(days.reduce((s,d)=>s+d.legs.reduce((t,g)=>t+g.l.d,0),0))+' '+unitTxt()
     + (nights? ' \u00b7 '+nights+' day'+(nights===1?'':'s')+' out after dark' : '');
+  restore();
 }
 function planEdit(fn){
   const r=activeRt(); if(!r) return;
