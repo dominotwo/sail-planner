@@ -519,6 +519,15 @@
   /* A wrapping flex row packs each line to its own content, so the second row's
      boxes never line up under the first. A grid gives them columns. */
   .chks { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--space-2) var(--space-4); }
+  /* M12: a layer that failed says so under its own switch. Never a modal and
+     never over the chart — you are reading the chart when this happens. */
+  .lyr-err {
+    grid-column:1/-1; flex:1 0 100%;      /* the chart layers are a grid, the plan header a flex row */
+    display:flex; align-items:center; flex-wrap:wrap;
+    gap:var(--space-2); color:var(--warn-t); font-size:11px; line-height:1.4;
+    padding:1px 0 4px;
+  }
+  .lyr-err .btn { color:var(--ac-soft); }
   .chk { display:flex; align-items:center; gap:var(--space-3); font-size:11.5px; color:var(--muted); cursor:pointer; padding:3px 0; min-height:22px; }
   .chk:hover { color:var(--ac-soft); }
   /* a layer that is fetching: the label says so instead of the tick looking inert */
@@ -2687,6 +2696,20 @@ function setBase(){
   baseLayer=L.tileLayer(b.url,{attribution:b.attribution, maxZoom:b.maxZoom,
     maxNativeZoom:b.maxNativeZoom, detectRetina:false, zIndex:1,
     crossOrigin:'anonymous'}).addTo(map);
+  /* There was no tileerror handler, so a chart of blank squares said nothing at
+     all. One line under the Land control, and it clears itself the moment a
+     tile does arrive - panning back into coverage should not leave a stale
+     complaint on screen. Counted rather than announced per tile: a lost
+     connection fails dozens at once. */
+  let baseFails=0, baseTimer=null;
+  baseLayer.on('tileerror', ()=>{
+    baseFails++;
+    clearTimeout(baseTimer);
+    baseTimer=setTimeout(()=>{
+      baseStatus('Chart tiles aren\u2019t loading.', ()=>{ baseFails=0; baseStatus(null); baseLayer.redraw(); });
+    }, 400);
+  });
+  baseLayer.on('tileload', ()=>{ if(baseFails){ baseFails=0; clearTimeout(baseTimer); baseStatus(null); } });
   stackSea();
 }const legLayer = L.layerGroup().addTo(map);
 /* Every leg's drawn geometry, kept so the cross-highlight can trace the leg
@@ -3389,7 +3412,11 @@ async function atonRefresh(){
   let feats=atonCache.get(box);
   if(!feats){
     const u=`${ATON_URL}?where=1%3D1&geometry=${box}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=aidname,characteristics,aidheight,aidrange,structure,lightlistnumber&outSR=4326&resultRecordCount=2000&f=geojson`;
-    feats = await fetch(u).then(r=>r.ok? r.json():null).then(j=>(j&&j.features)||[]).catch(()=>[]);
+    /* null, not [] — an empty array meant both "no aids in this box" and "the
+       request failed", so a failure looked like clear water. */
+    feats = await fetch(u).then(r=>r.ok? r.json():null).then(j=>j&&(j.features||[])).catch(()=>null);
+    if(!feats){ layerStatus('marksChk','Navaids didn\u2019t load.', ()=>atonRefresh()); return; }
+    layerStatus('marksChk', null);
     atonCache.set(box,feats);
   }
   if(tok!==atonToken || !S.marks) return;
@@ -3513,6 +3540,7 @@ function chaikin(pts, iters){
   }
   return p;
 }
+let isoFails=0;                  // reset per isoRefresh
 function isoTile(z,x,y){
   const k=z+'/'+x+'/'+y;
   if(isoCache.has(k)) return isoCache.get(k);
@@ -3536,7 +3564,7 @@ function isoTile(z,x,y){
       });
       return byDepth;
     })
-    .catch(()=>({}));
+    .catch(()=>{ isoCache.delete(k); isoFails++; return {}; });
   isoCache.set(k,p);
   return p;
 }
@@ -3558,8 +3586,11 @@ async function isoRefresh(){
   for(let x=a.x;x<=c.x;x++) for(let y=a.y;y<=c.y;y++) keys.push([z,x,y]);
   if(keys.length>48) keys.length=48;
   const tok=++isoToken;
+  isoFails=0;
   const tiles=await Promise.all(keys.map(k=>isoTile(k[0],k[1],k[2])));
   if(tok!==isoToken || !S.topo) return;
+  if(isoFails) layerStatus('topoChk','Contours didn\u2019t load.', ()=>isoRefresh());
+  else layerStatus('topoChk', null);
   const merged=new Map();
   tiles.forEach(t=>{ for(const d in t){ const k=+d; if(!merged.has(k)) merged.set(k,[]); merged.get(k).push(...t[d]); } });
   merged.forEach((chains,d)=>{
@@ -3909,7 +3940,10 @@ async function rstRefresh(){
     const b=map.getBounds().pad(0.05);
     const key=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(2)).join(',');
     if(rstCache.has(key)){ rstList=rstCache.get(key); setLayers(); return; }
-    const sets=await Promise.all(RST_LAYERS.map(l=>withTimeout(encQuery(l.id,b)).catch(()=>[])));
+    let rstFailed=false;
+    const sets=await Promise.all(RST_LAYERS.map(l=>withTimeout(encQuery(l.id,b)).catch(()=>{ rstFailed=true; return []; })));
+    if(rstFailed) layerStatus('restChk','Restricted areas didn\u2019t load.', ()=>{ rstCache.delete(key); rstRefresh(); });
+    else layerStatus('restChk', null);
     const out=[];
     sets.forEach((feats,i)=>{
       const L0=RST_LAYERS[i];
@@ -3969,8 +4003,14 @@ function tideGet(lat,lon,date){
     const events=((hl&&hl.predictions)||[]).map(p=>({t:p.t.slice(11,16), v:+p.v, k:p.type}));
     tideCache.set(key, curve.length? {curve, events, st:near.s, away:near.d} : null);
     tidePending.delete(key);
+    layerStatus('planTide', null);
     if(S.planOpen) { renderPlan(); fitPlan(); }
-  }).catch(()=>{ tidePending.delete(key); tideCache.set(key,null); });
+  }).catch(()=>{
+    /* not cached as null - that is the "no station answered" value and would
+       make Retry a no-op */
+    tidePending.delete(key);
+    layerStatus('planTide','Tide predictions didn\u2019t load.', ()=>{ if(S.planOpen){ renderPlan(); fitPlan(); } });
+  });
   return undefined;
 }
 const hazCache=new Map();
@@ -3983,7 +4023,10 @@ async function hazRefresh(){
     const b=map.getBounds().pad(0.05);
     const key=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(2)).join(',');
     if(hazCache.has(key)){ hazList=hazCache.get(key); setLayers(); return; }
-    const sets=await Promise.all(HAZ_LAYERS.map(l=>withTimeout(encQuery(l.id,b)).catch(()=>[])));
+    let hazFailed=false;
+    const sets=await Promise.all(HAZ_LAYERS.map(l=>withTimeout(encQuery(l.id,b)).catch(()=>{ hazFailed=true; return []; })));
+    if(hazFailed) layerStatus('hazChk','Hazards didn\u2019t load.', ()=>{ hazCache.delete(key); hazRefresh(); });
+    else layerStatus('hazChk', null);
     const seen=new Set(), out=[];
     sets.forEach((feats,i)=>{
       const L0=HAZ_LAYERS[i];
@@ -4066,6 +4109,7 @@ function tileXY(lat,lon,z){
   const n=Math.pow(2,z), s=Math.sin(lat*Math.PI/180);
   return [(lon+180)/360*n, (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n];
 }
+let elevFails=0;                 // reset per bottomRefresh; see its finally
 function elevTile(z,x,y){
   const k=z+'/'+x+'/'+y;
   if(elevCache.has(k)) return elevCache.get(k);
@@ -4082,7 +4126,7 @@ function elevTile(z,x,y){
       const t={g, w, h:hh};
       elevReady.set(k,t); res(t);
     };
-    img.onerror=()=>{ elevReady.set(k,null); res(null); };
+    img.onerror=()=>{ elevReady.set(k,null); elevCache.delete(k); elevFails++; res(null); };
     img.src='https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+z+'/'+x+'/'+y+'.png';
   });
   elevCache.set(k,p); return p;
@@ -4220,7 +4264,7 @@ async function bottomRefresh(){
   /* A pan mid-load used to be dropped on the floor, leaving the overlay drawn
      for the previous view. Remember it instead and re-run once. */
   if(botBusy){ botAgain=true; return; }
-  botBusy=true; botBusyUI(true);
+  botBusy=true; botBusyUI(true); elevFails=0;
   try{
     const b=map.getBounds();
     await elevLoad(b,0,80);
@@ -4278,6 +4322,10 @@ async function bottomRefresh(){
     botOverlay=L.imageOverlay(cv.toDataURL(), b, {pane:'zones', opacity:1, interactive:false}).addTo(map);
   } finally {
     botBusy=false; botBusyUI(false);
+    /* the failed tiles are dropped from the cache, so Retry really re-fetches
+       them rather than replaying the same misses */
+    if(elevFails) layerStatus('botChk', elevFails+' depth tile'+(elevFails>1?'s':'')+' didn\u2019t load.', ()=>bottomRefresh());
+    else layerStatus('botChk', null);
     if(botAgain){ botAgain=false; bottomRefresh(); }
   }
 }
@@ -4347,11 +4395,12 @@ async function anchFetch(){
   if(anchCache.has(key)) return anchCache.get(key);
   const vb=b.getWest().toFixed(4)+','+b.getNorth().toFixed(4)+','+b.getEast().toFixed(4)+','+b.getSouth().toFixed(4);
   const seen=new Map();
+  let anchFailed=0;
   for(const q of ['cove','bay','harbor','marina','anchorage']){
     try{
       const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=40&bounded=1'
         +'&viewbox='+vb+'&q='+q);
-      if(!r.ok) continue;
+      if(!r.ok){ anchFailed++; continue; }
       (await r.json()).forEach(f=>{
         if(!ANCH_TYPES.test(f.type||'')) return;
         const nm=(f.name||'').trim(); if(!nm) return;
@@ -4365,10 +4414,15 @@ async function anchFetch(){
         const id=nm.toLowerCase()+'@'+(+f.lat).toFixed(3);
         if(!seen.has(id)) seen.set(id,{n:nm, lat:+f.lat, lon:+f.lon, t:f.type});
       });
-    }catch(e){}
+    }catch(e){ anchFailed++; }
     await new Promise(r=>setTimeout(r,120));
   }
   const list=[...seen.values()].slice(0,60);
+  /* five queries; all five failing is a network problem, some of them failing
+     is Nominatim rate-limiting us and the result is merely thin. Only the
+     first is worth saying out loud - and it is not cached, so Retry re-asks. */
+  if(anchFailed>=5){ layerStatus('anchChk','Anchorage search didn\u2019t load.', ()=>anchRefresh()); return list; }
+  layerStatus('anchChk', null);
   anchCache.set(key,list);
   return list;
 }
@@ -4462,10 +4516,48 @@ async function loadMPA(){
     +'&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects'
     +'&geometry=' + encodeURIComponent(JSON.stringify({xmin:-119.4,ymin:33.0,xmax:-117.5,ymax:34.1}))
     + '&maxAllowableOffset=0.0004&f=geojson';
-  try{ const r=await fetch(url); mpaCache = r.ok? await r.json() : {features:[]}; }
-  catch(e){ mpaCache={features:[]}; }
+  try{
+    const r=await fetch(url);
+    if(!r.ok) throw new Error(r.status);
+    mpaCache = await r.json();
+    layerStatus('mpaChk', null);
+  }
+  catch(e){
+    /* cache stays null so the retry is a real retry rather than a re-read of
+       an empty answer */
+    mpaCache=null; mpaPending=false;
+    layerStatus('mpaChk','Protected areas didn\u2019t load.', ()=>loadMPA());
+    return;
+  }
   mpaPending=false;
   if(S.lyrMpa) setLayers();
+}
+/* ---------------- M12: say when a layer did not load ----------------
+   Tides, hazards, protected and restricted areas, navaids and the elevation
+   tiles all caught their own failures and rendered nothing. On a boat out of
+   coverage that is most of the chart quietly missing while every switch still
+   reads on. Each failure puts one line under its own control, with one retry.
+   A status line, not a modal, and never over the chart. */
+/* The basemap has no checkbox; the Land segmented control is what it belongs
+   under, so the line goes after that. */
+function baseStatus(msg, retry){ statusAfter(document.getElementById('baseSeg'), msg, retry); }
+function layerStatus(inputId, msg, retry){
+  const inp=document.getElementById(inputId); if(!inp) return;
+  statusAfter(inp.closest('.chk'), msg, retry);
+}
+function statusAfter(label, msg, retry){
+  if(!label) return;
+  let el=label.nextElementSibling;
+  const has = el && el.classList && el.classList.contains('lyr-err');
+  if(!msg){ if(has) el.remove(); return; }
+  if(!has){ el=document.createElement('div'); el.className='lyr-err'; label.after(el); }
+  el.textContent=msg+' ';
+  if(retry){
+    const b=document.createElement('button');
+    b.type='button'; b.className='btn btn-ghost mini'; b.textContent='Retry';
+    b.addEventListener('click', e=>{ e.preventDefault(); statusAfter(label,null); retry(); });
+    el.appendChild(b);
+  }
 }
 function setLayers(){
   const key=document.getElementById('sbKey');
