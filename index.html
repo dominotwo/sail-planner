@@ -751,6 +751,10 @@
   .dttl { font-size:13.5px; }
   .dsub { color:var(--muted-2); font-size:11px; }
   .iconx {
+    /* padding:0 — a bare <button> carries the UA's 1px 6px, which left a 13px
+       icon centring inside an 8px content box and sitting 2.5px off. A text
+       glyph never showed it; an SVG does. */
+    padding:0;
     margin-left:auto; width:22px; height:22px; display:grid; place-items:center; cursor:pointer; flex:none;
     background:transparent; border:1px solid var(--line); border-radius:var(--radius-sm);
     color:var(--muted-2); font-size:13px; line-height:1;
@@ -808,16 +812,7 @@
   .drawer[data-max="true"] .pdep { grid-template-columns:1fr; }
   .drawer[data-max="true"] .ptime { min-height:0; padding:1px 5px; }
   .drawer[data-max="true"] .pleg { padding:var(--space-1) 0; row-gap:1px; }
-  /* 22 and 24, not 26. Both keep their 44px reach — the pseudo is centred on
-     the box and does not care how big the box is — and between them they are
-     6px a day, which is the difference between fitting an iPhone 12's ~677px
-     of usable height and being 15px over it. */
-  .drawer[data-max="true"] .pleg > .btn.mini { width:22px; height:22px; font-size:13px; }
-  .drawer[data-max="true"] .pday { padding:var(--space-1) 0; }
-  .drawer[data-max="true"] .pday-act .btn.mini { width:24px; height:24px; font-size:13px; }
-  .drawer[data-max="true"] .pbarw { padding:6px 0 6px; }
-  .drawer[data-max="true"] .ptide { margin:11px 0; }
-  .drawer[data-max="true"] .pslack { padding-top:0; padding-bottom:0; }
+  /* the rest of the compression is not maximised-only — see the phone block */
 
   /* ---------- plan dock: days down the page, legs inside them ---------- */
   /* The bar, the tide curve, the axis and the leg row all share one 24-hour
@@ -1239,7 +1234,10 @@
        day's x button reaches 44px out of a 30px box and that overhang sits at
        the right edge. The room it needs is given rather than clipped, so the
        button keeps its full reach and the pane stops moving. */
-    #panePlan .pane-body { padding-right:7px; }
+    /* 10px, not 7: the overhang is half the difference between the reach and
+       the box, so shrinking the button from 30px to 24px grew it from 7 to 10.
+       Change the button, change this. */
+    #panePlan .pane-body { padding-right:11px; }
 
     /* One surface at a time. Measured at 390x844 with everything open: the
        sidebar alone covers 83% of the screen, 89% of the viewport sits under some
@@ -1425,7 +1423,7 @@
        elementFromPoint inside the overlap, which is why they are real boxes. */
     .pleg > .btn.mini {
       order:0; margin-left:auto; position:relative;
-      min-width:0; min-height:0; width:30px; height:30px; font-size:15px;
+      min-width:0; min-height:0; width:22px; height:22px; font-size:13px;
     }
     .pleg > .btn.mini::after {
       content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -1612,20 +1610,34 @@
        same coupling .rleg and .pleg carry a warning about. */
     .pdep { grid-template-columns:44px 1fr 44px; gap:2px; }
     .pstep { width:44px; height:44px; font-size:16px; }
+    /* ---- vertical compression, every view ----
+       These cost nothing. The two buttons keep their full 44px reach, because
+       the pseudo is centred on the box and does not care how big the box is;
+       the paddings were holding air. Worth 15px a day, in the maximised
+       reading view and the normal one alike.
+
+       The gap between + and x moves with them: two 24px boxes need 20px
+       between their centres' 44px reaches to stay independent, where two 30px
+       boxes needed 14. Shrink the boxes and not the gap and the midpoint
+       between them stops resolving to the nearer one. */
+    .pbarw { padding:6px 0 6px; }
+    .pslack { padding-top:0; padding-bottom:0; }
+
     /* 30px boxes, 44px reach - the same trade .pleg's give-a-day-back button
        makes. At a real 44x44 this pair was the tallest thing in the day header
        and set it to 44px on its own, while nothing else on that line is over
-       20px. The 14px gap is not cosmetic: two 30px boxes 5.6px apart have their
-       44px reaches overlapping by 8px, so the midpoint between + and x would
-       resolve to whichever painted last - the trap the route arrows sprang. At
-       14 they meet exactly and each keeps its own half. */
-    .pday-act { gap:14px; }
+       20px. The gap is not cosmetic and it moves with the box: two 24px boxes
+       need 20px between them for their 44px reaches to meet exactly rather than
+       overlap, where two 30px boxes needed 14. Shrink the box and not the gap
+       and the midpoint between + and x stops resolving to the nearer one -
+       the trap the route arrows sprang. */
+    .pday-act { gap:20px; }
     /* .btn.mini, not .btn: the blanket `.btn.mini { min-width:44px }` below is
        two classes and sits later in this block, so a two-class selector here
        loses to it - the gap applied and the size did not. Three classes wins,
        which is the form .pleg's button already uses. */
     .pday-act .btn.mini {
-      min-width:0; min-height:0; width:30px; height:30px; font-size:15px;
+      min-width:0; min-height:0; width:24px; height:24px; font-size:13px;
       /* z-index, because the reach extends 7px past the box into .pscale - a
          later sibling, so it painted over the pseudo and elementFromPoint gave
          the axis strip. The axis is not interactive, so nothing is taken from
@@ -5477,18 +5489,24 @@ function fitPlan(){
   const mxb=document.getElementById('planMax');
   if(mxb) mxb.setAttribute('aria-pressed', !!(S.planOpen && S.pmax));
   planHeadHome();
-  if(!S.planOpen){ b.style.maxHeight=''; return; }
+  if(!S.planOpen){ b.style.maxHeight=''; b.style.height=''; return; }
   /* Maximised takes the whole stage, MIN_CHART included - the point is to read
      a plan end to end without scrolling, and 72px of chart under it is not a
      chart, it is a stripe. Straight to the height rather than through
      availBody, whose whole job is protecting a share for the map. */
   if(S.pmax){
     const top0=holdScroll('plan');
-    const head=planTop.offsetHeight;
-    b.style.maxHeight = Math.max(110, document.querySelector('.stage').clientHeight - head) + 'px';
+    /* height, not max-height. With a cap the dock still only took what its
+       content needed, so on a short plan - and on any desktop, where the stage
+       is tall - maximising visibly did nothing. The header is inside the pane
+       now, so the whole stage is the number. */
+    const h = Math.max(110, document.querySelector('.stage').clientHeight);
+    b.style.maxHeight = h + 'px';
+    b.style.height = h + 'px';
     releaseScroll('plan', top0);
     return;
   }
+  b.style.height='';
   const top=holdScroll('plan');
   b.style.maxHeight='none';
   const need=document.getElementById('panePlan').scrollHeight + 10;

@@ -115,10 +115,15 @@ thing opted into is density), the paddings tighten, and the dock header moves
 *inside* the scroller so its 63px goes to the plan. That header only scrolls out
 of sight when there is something to scroll, which is what makes it safe.
 
-Measured at 390px, a four-day plan **including the header**: 604px with tides
-off, in either clock mode — against an iPhone 12's ~677px of usable height once
-Safari's own chrome is out. It was 847px before this. With tides on it is 796px
-and still scrolls; the tide curve is 48px a day and nothing else is left to give.
+It sets `height`, not `max-height` — with a cap the dock still only took what
+its content needed, so maximising a short plan, or maximising at all on a
+desktop, visibly did nothing.
+
+Measured at 390px, a four-day plan **including the header**: 606px with tides
+off and 814px with them on, in either clock mode — against an iPhone 12's
+~677px of usable height once Safari's own chrome is out. It was 847px before
+this pass. The compression that got it there is **not** maximised-only: the
+normal plan view went 212px a day to 191px from the same trims.
 
 Header heights are **measured**, not assumed to be 40px — a phone dock header is
 ~63px once its controls are finger-sized, and the estimate is what put the chart
