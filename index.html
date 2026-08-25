@@ -760,6 +760,8 @@
   .pbar-grid { position:absolute; top:0; bottom:0; width:1px; background:color-mix(in srgb, var(--color-text) 12%, transparent); }
   /* the hours the bars are drawn against, printed once above them */
   .pscale { position:relative; height:19px; margin:var(--space-1) 0 0; }
+  /* without labels the box only has to hold a 5px tick, not a line of text */
+  .pscale.bare { height:7px; }
   .pstick { position:absolute; top:0; width:1px; height:3px; background:var(--line); }
   .pstick.maj { height:5px; background:color-mix(in srgb, var(--muted-2) 70%, transparent); }
   .pstick i {
@@ -989,7 +991,13 @@
        ~355px; it overflowed a 299px pane rather than wrapping. */
     .phead { flex-wrap:wrap; row-gap:var(--space-2); }
     /* the date plus sun and moon times do not fit one line at 360px */
+    /* The moonrise and moonset times are what pushed the day actions onto a
+       second line here. The phase glyph stays - it is the part you read at a
+       glance - and the exact times remain in the title. With them gone the date,
+       the sun times, the moon and the +/x all fit one line. */
+    .pday-moont { display:none; }
     .pday-h { flex-wrap:wrap; row-gap:var(--space-1); }
+    .pday-sky { gap:var(--space-3); }
     .drawer-top { flex-wrap:wrap; row-gap:var(--space-2); }
     .drawer-top .dsub { display:none; }
     .drawer-top .dttl { flex:0 0 auto; }
@@ -4863,7 +4871,7 @@ function renderPlan(){
   /* Only the first day spells the hours out; the rest get the same ticks
      without labels. Four labelled axes in a row is a lot of repeated text
      for a scale that never changes. */
-  const planScale = (labels) => '<div class="pscale" aria-hidden="true">'
+  const planScale = (labels) => '<div class="pscale'+(labels?'':' bare')+'" aria-hidden="true">'
     + [0,3,6,9,12,15,18,21,24].map(hh=>{
         const maj = hh%6===0;
         const edge = hh===0? ' first' : hh===24? ' last' : '';
@@ -4912,7 +4920,7 @@ function renderPlan(){
           ${d.sun? '<span class="pday-sun" title="Sunrise and sunset">'+SUNGLYPH+HHMM(d.sun.rise)+'\u2013'+HHMM(d.sun.set)+'</span>' : ''}
           ${d.moon? '<span class="pday-moon" title="Moon: '+moonName(d.lune.phase, d.lune.fraction)+', '+Math.round(d.lune.fraction*100)+'% lit \u00b7 up '+(d.moon.rise? HHMM(d.moon.rise):'\u2014')+', down '+(d.moon.set? HHMM(d.moon.set):'\u2014')+'">'
               +moonSVG(d.lune.phase,13)
-              +(d.moon.rise? '\u2191'+HHMM(d.moon.rise):'')+(d.moon.set? ' \u2193'+HHMM(d.moon.set):'')+'</span>' : ''}
+              +'<span class="pday-moont">'+(d.moon.rise? '\u2191'+HHMM(d.moon.rise):'')+(d.moon.set? ' \u2193'+HHMM(d.moon.set):'')+'</span></span>' : ''}
         </span>
         <span class="pday-tot">
           ${d.legs.length>1? '<span>'+hm(d.hours)+' under way</span>' : ''}   <!-- one leg already prints its own duration in the row below -->
