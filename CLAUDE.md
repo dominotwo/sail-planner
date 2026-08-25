@@ -109,9 +109,16 @@ map, which is the opposite of what maximised wants. It still uses `max-height`,
 so a plan shorter than the screen leaves a strip of chart rather than dead
 space; the Conditions pill and the zoom control hide while it is on, because
 they were floating in that strip over nothing. Dragging the header clears it —
-a dragged height *is* an un-maximise. Measured at 390×844: a four-day plan is
-704px with tides off and fits a 764px maximised body; with tides on it is 912px
-and still scrolls.
+a dragged height *is* an un-maximise. Maximised is also a **reading view**: the ±15min steps hide, the departure field
+drops its 44px minimum (a deliberate M3 exception — maximised is opt-in and the
+thing opted into is density), the paddings tighten, and the dock header moves
+*inside* the scroller so its 63px goes to the plan. That header only scrolls out
+of sight when there is something to scroll, which is what makes it safe.
+
+Measured at 390px, a four-day plan **including the header**: 604px with tides
+off, in either clock mode — against an iPhone 12's ~677px of usable height once
+Safari's own chrome is out. It was 847px before this. With tides on it is 796px
+and still scrolls; the tide curve is 48px a day and nothing else is left to give.
 
 Header heights are **measured**, not assumed to be 40px — a phone dock header is
 ~63px once its controls are finger-sized, and the estimate is what put the chart

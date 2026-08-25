@@ -771,6 +771,54 @@
   :root[data-pmax="true"] .ctrls,
   :root[data-pmax="true"] .leaflet-control-zoom { display:none; }
 
+  /* ---------------- maximised: a reading view ----------------
+     Maximising was not enough on a real phone, because Safari's own chrome
+     takes 100-180px that a 100dvh measurement in a headless window does not
+     see. Four days at 160px (24h) or 183px (12h) plus a 63px dock header and a
+     52px plan header do not fit what is left.
+
+     The ±15min steps are what set the floor. They are 88px of every leg row's
+     width and their 44px targets are its whole height; without them the row is
+     the two lines of text it actually contains. So they go while maximised,
+     and the departure stays a 16px field - readable, still editable, no longer
+     carrying a 44px minimum. That is a deliberate M3 exception: maximised is
+     opt-in and the thing opted into is density. Un-maximise to nudge a time
+     with your thumb.
+
+     Then the paddings and the two 30px buttons, which have 44px of reach
+     either way. */
+  /* it is inside the scroller now, so it needs its own ground and its own rule
+     rather than relying on being a separate block above one */
+  .drawer[data-max="true"] .drawer-top {
+    background:var(--color-bg); border-bottom:1px solid var(--line);
+    margin-bottom:var(--space-3);
+    /* Inside the pane it has 44.8px less room than it had as a sibling of it,
+       and its contents come to 248.4px against 248 — so the close button
+       wrapped to a line of its own. The horizontal padding gives that back. */
+    padding-left:var(--space-4); padding-right:var(--space-4);
+    /* and nowrap, or nothing shrinks: with wrap on, the route name keeps its
+       full 72px and the close button goes to a line of its own instead. It has
+       min-width:0 and an ellipsis for exactly this. */
+    flex-wrap:nowrap;
+  }
+  /* 90px of the header for a display preference you set once. Without it the
+     route name has 117px and is readable; with it, it ellipsised to 23. */
+  .drawer[data-max="true"] .seg.tiny { display:none; }
+  .drawer[data-max="true"] .pstep { display:none; }
+  .drawer[data-max="true"] .pdep { grid-template-columns:1fr; }
+  .drawer[data-max="true"] .ptime { min-height:0; padding:1px 5px; }
+  .drawer[data-max="true"] .pleg { padding:var(--space-1) 0; row-gap:1px; }
+  /* 22 and 24, not 26. Both keep their 44px reach — the pseudo is centred on
+     the box and does not care how big the box is — and between them they are
+     6px a day, which is the difference between fitting an iPhone 12's ~677px
+     of usable height and being 15px over it. */
+  .drawer[data-max="true"] .pleg > .btn.mini { width:22px; height:22px; font-size:13px; }
+  .drawer[data-max="true"] .pday { padding:var(--space-1) 0; }
+  .drawer[data-max="true"] .pday-act .btn.mini { width:24px; height:24px; font-size:13px; }
+  .drawer[data-max="true"] .pbarw { padding:6px 0 6px; }
+  .drawer[data-max="true"] .ptide { margin:11px 0; }
+  .drawer[data-max="true"] .pslack { padding-top:0; padding-bottom:0; }
+
   /* ---------- plan dock: days down the page, legs inside them ---------- */
   /* The bar, the tide curve, the axis and the leg row all share one 24-hour
      x-mapping, so they are capped together rather than individually - capping
@@ -1499,6 +1547,9 @@
     .phead .ptime       { width:158px; }     /* a full date plus its picker glyph */
     .phead .hm          { width:76px; }
     .pleg .ptime        { width:76px; }
+    /* "11:00 am" is wider than "09:00" and was being cut to "11:00 an". A
+       departure you cannot read is worse than a row that wraps. */
+    :root[data-clock="12"] .pleg .ptime { width:90px; }
     .loc-edit, .rt-edit { padding:2px 6px; }
   }
 
@@ -5404,6 +5455,19 @@ function releaseScroll(k, top){
   void p.offsetHeight;
   p.scrollTop=top;
 }
+/* Maximised, the dock header moves inside the scroller, so its 63px goes to
+   the plan instead of sitting above it. The same element, moved — not a copy —
+   so the drag-to-resize and double-click-to-fit on it keep working.
+
+   It only ever scrolls out of sight when there IS something to scroll: a plan
+   that fits leaves it on screen the whole time. That is what makes this safe —
+   the way out of maximised disappears exactly when scrolling back up is the
+   obvious thing to do anyway. */
+function planHeadHome(){
+  const want = (S.planOpen && S.pmax)? document.getElementById('panePlan') : planDock;
+  if(!want || planTop.parentNode===want) return;
+  want.insertBefore(planTop, want.firstChild);
+}
 function fitPlan(){
   const b=planDock.querySelector('.drawer-b');
   if(!b) return;
@@ -5412,6 +5476,7 @@ function fitPlan(){
   document.documentElement.dataset.pmax = (S.planOpen && S.pmax)? 'true':'false';
   const mxb=document.getElementById('planMax');
   if(mxb) mxb.setAttribute('aria-pressed', !!(S.planOpen && S.pmax));
+  planHeadHome();
   if(!S.planOpen){ b.style.maxHeight=''; return; }
   /* Maximised takes the whole stage, MIN_CHART included - the point is to read
      a plan end to end without scrolling, and 72px of chart under it is not a
@@ -6126,6 +6191,7 @@ function planEdit(fn){
 }
 function all(){
   document.documentElement.dataset.pal = S.pal;
+  document.documentElement.dataset.clock = S.clock24? '24':'12';
   /* the browser's own chrome is part of the page on a phone; leaving it at one
      colour while the chart switches between three is the visible seam */
   const tc=document.getElementById('themeColor');
