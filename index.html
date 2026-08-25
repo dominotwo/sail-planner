@@ -4175,10 +4175,13 @@ function applyHL(){
     });
   }
   if(!hl) return;
-  document.querySelectorAll(`[data-loc="${hl}"]`).forEach(el=>el.classList.add('hl'));
-  /* a leg has two ends: mark where it starts as well as where it finishes */
-  if(hlLeg) hlLeg.forEach(id=>document.querySelectorAll(`[data-loc="${id}"]`).forEach(el=>el.classList.add('hl')));
-  document.querySelectorAll(`td[data-row="${hl}"], td[data-col="${hl}"]`).forEach(el=>el.classList.add('hl'));
+  /* The chart only, and only the place under the pointer.
+     This used to mark every [data-loc] match, which lit the sidebar row, the
+     plan row and the matrix column all at once, and a second pass marked BOTH
+     ends of a leg so the origin lit up too. Hovering one thing should point at
+     one thing. The leg trace above still spans the whole leg, because that is
+     what a leg is. */
+  document.querySelectorAll(`.pin[data-loc="${hl}"]`).forEach(el=>el.classList.add('hl'));
 }
 function setHL(id, leg){
   const lk=leg? leg.join('|') : null, cur=hlLeg? hlLeg.join('|') : null;
