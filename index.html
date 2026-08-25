@@ -156,7 +156,19 @@
     background: var(--color-bg); color: var(--color-text);
     font-family: var(--font-body); font-size: 13px; line-height:1.45;
     overflow:hidden;
+    /* Safari rubber-bands the document even with overflow:hidden, so scrolling
+       a dock past its end dragged the whole page under the chart. */
+    overscroll-behavior:none;
+    /* Safari's stock tap flash is a blue-grey it picks, not one of ours - the
+       single uncalibrated colour on screen, and glaring against the
+       red-shifted Night table. Inherited, so this one line covers everything;
+       the pressed states that replace it are in the (hover:none) block. */
+    -webkit-tap-highlight-color:transparent;
   }
+
+  /* Every scroller stops at its own end instead of chaining into whatever is
+     behind it. Not gated on touch: scroll chaining is wrong with a wheel too. */
+  .side-scroll, .pane, .drawer-b, .float-b { overscroll-behavior:contain; }
   a { color: var(--ac-soft); text-decoration:none; }
   a:hover { color: var(--ac); }
   :focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
@@ -1113,6 +1125,18 @@
     .btn.mini::after  { content:""; position:absolute; inset:-5px -2px; }
     .loc-chk::after   { content:""; position:absolute; inset:-5px; }   /* 16px box -> 26px target */
     .rt-eye::after    { content:""; position:absolute; inset:-6px -4px; }
+
+    /* ---- pressed states, since there is no hover to give feedback ----
+       Every colour here is a palette token, so the flash is calibrated in all
+       three tables rather than being Safari's own blue-grey.
+       :active alone is not enough on iOS: WebKit only applies it to arbitrary
+       elements once the document has a touch listener, which is why there is a
+       no-op touchstart handler in the script. */
+    .btn:active, .rbtn:active, .iconx:active, .radd select:active,
+    .pstep:active, .loc-chk:active, .rt-eye:active {
+      background:var(--ac-fill); border-color:var(--ac-line); color:var(--ac);
+    }
+    .loc:active, .rleg:active, .pleg:active, .pday-h:active { background:var(--row-h); }
 
     /* ---- no text field under 16px ----
        Safari zooms the page when a field smaller than 16px takes focus, and it
@@ -4363,6 +4387,12 @@ spd.addEventListener('input',()=>{ S.spd=+spd.value; all(); });
 
 const wel=document.getElementById('welcome');
 if(!lsGet('sp_welcome')) wel.dataset.on='true';
+/* WebKit applies :active to a div only once the document has a touch listener,
+   so without this the palette-coloured pressed states on .loc, .rleg and .pleg
+   would never appear on the device they were written for. Passive and empty -
+   its existence is the whole effect. */
+document.addEventListener('touchstart', ()=>{}, {passive:true});
+
 /* ?ft=1 shows the SVG-filter self test — see the note by .ftest */
 if(/[?&]ft=1\b/.test(location.search)) document.getElementById('ftest').hidden=false;
 /* Everything the chart's look depends on, read off the device rather than
