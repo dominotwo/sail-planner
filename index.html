@@ -2440,6 +2440,25 @@ function sunAt(date, lat, lon, altDeg){
   return { rise: fromJ(noon-(set-noon)), set: fromJ(set) };
 }
 const SUN = (date,lat,lon) => sunAt(date,lat,lon,-0.833);
+
+/* ---------------- the palette a first visit opens on ----------------
+   Three calibrated tables is the right marine answer, and Dusk is right for a
+   laptop below decks. It is the wrong default for the device most likely to be
+   outdoors: on a phone in sun, Dusk is the one you cannot read.
+
+   Day between local sunrise and sunset, Dusk otherwise. Only ever on a first
+   visit - after that S.pal is in the saved state and whatever anyone chose
+   wins, including choosing Dusk at noon. Sunrise and sunset are solved for the
+   Bight rather than the visitor's own position: this app is about one stretch
+   of coast, and asking for geolocation to pick a colour is not a trade worth
+   making. It runs before segWire reads S.pal, so the Conditions panel shows
+   the option that is actually in force. */
+if(FRESH){
+  try{
+    const ref=SEED[0], now=new Date(), t=SUN(now, ref.lat, ref.lon);
+    if(t && t.rise && t.set && now>=t.rise && now<=t.set) S.pal='day';
+  }catch(e){}                      // a palette is not worth throwing over
+}
 const TWILIGHT = (date,lat,lon) => sunAt(date,lat,lon,-6);      // civil: dawn and dusk
 /* The moon, for a passage plan: when it is up, and how much of it there is. */
 function moonCoords(d){
