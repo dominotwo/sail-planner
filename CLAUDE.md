@@ -25,6 +25,34 @@ internet at all. See `vendor/README.md` before touching either.
   to `localStorage` under `sailplanner.v4`. Bump the key if the shape changes
   incompatibly, and migrate rather than discard.
 
+## Responsive: three gates, and where the rules go
+Media queries add no specificity, so **every responsive block lives at the end
+of the sheet**, after the rules it overrides. Four blocks sat mid-sheet once and
+were simply dead.
+
+| Gate | Means | Holds |
+|---|---|---|
+| `(max-width:720px)` | narrow, mouse or finger | phone layout: one surface at a time, docks, `.rleg`/`.pleg` templates |
+| `(hover:none)` | any touch device incl. tablet | actions that hover used to reveal, 16px text fields, pressed states |
+| `(hover:none) and (max-width:720px)` | a phone | the 44px minimum targets (M3) |
+
+The third is deliberately narrower than the second. A tablet keeps the dense
+desktop grids — `.pcols`, `.pleg` and `.pdep` hold controls in 12/16/20px
+tracks, and a 44px minimum walks them out of those tracks.
+
+## Tokens this app adds
+`styles.css` is the design system. These are app-shell tokens, defined in
+`index.html`'s own `:root`:
+
+- `--safe-t/r/b/l` — `env(safe-area-inset-*)` with a `0px` fallback, so every
+  `calc()` is a no-op on a device without insets.
+- `--rail` / `--rail-edge` — the collapsed sidebar's width, and that plus the
+  left inset. **Five rules are pinned to it**: the grid template at both widths,
+  the peek panel, the filter probe, and the matrix float. They were five
+  separate literals; change the token, not the literals. `--rail` is 42px, 48px
+  on a phone (a 44px button with 2px either side).
+- `--tap` — 44px, the touch minimum and what the audit script checks.
+
 ## Layout of index.html
 1. `<head>` — meta, fonts, tokens stylesheet, Leaflet, then the app's `<style>`.
 2. `<style>` — palettes first, then chrome (sidebar, drawers, floats), then the
@@ -67,6 +95,38 @@ The day bar is a fixed 24-hour scale: x = hour/24. The axis (`.pscale`), the
 day bars, the leg blocks and the tide curve all share that mapping — change one
 and change all four.
 
+## Traps this file has already sprung
+Each of these cost a debugging round. They are all still live.
+
+- **Hiding a grid child shifts every later sibling one track left**, and a child
+  bigger than its track overflows the row by exactly the difference. `.rleg`,
+  `.pleg`, `.pdep` and `.pcols` all carry hand-tuned templates. **Change the
+  child, change the template.** Bitten three times: `.grip` restored without
+  updating `.rleg`; a 44px `.pstep` in `.pdep`'s 16px track; a 44px `.rdel` in
+  `.rleg`'s 18px track.
+- **The spacing ramp has holes.** 1, 2, 3, 4, 6, 8 exist; `--space-5` and
+  `--space-7` do not, and referencing one silently drops the declaration and
+  takes the initial value. Grep before you use.
+- **`::before` / `::after` do not render on `<input>`** — it is a replaced
+  element. A pseudo-element hit area on a checkbox never worked; grow the box or
+  let its `<label>` be the target.
+- **The child combinator does not reach through `display:contents`.** It removes
+  the wrapper's *box*, not the wrapper, so `.rleg > .rleg-meta` matches nothing.
+  Use a descendant selector.
+- **HTML5 drag does fire on iOS via long-press.** Two passes hid the grips on
+  the opposite premise. Reordering a stop or a plan leg by drag works on a
+  phone; the arrows are hidden below 720px and `.rnote` says so.
+- **Headless Chrome reports `(hover:none)` true and `(pointer:coarse)` false**,
+  with `maxTouchPoints:0`. So it renders touch variants at desktop widths — a
+  false "desktop regression" — and cannot exercise a `pointer:coarse` gate at
+  all. Neutralise `(hover:none)` blocks when doing desktop comparisons.
+- **Set a dock's explicit size before calling `availBody`.** A non-null
+  `S.ph`/`S.dh` is what marks a dock deliberately sized, and that changes the
+  other dock's ceiling.
+- **Night's chart-semantic exceptions stay.** The green "better" delta, the
+  cool-grey moon limb and the amber daylight band are settled — don't red-shift
+  them for consistency.
+
 ## Known issues, deliberately not fixed
 
 These were found in a full review on 2026-08-23 and consciously deferred. Read
@@ -91,7 +151,13 @@ before "discovering" any of them again.
 - **Six destructive actions have no confirmation and no undo** — route delete,
   location delete, `clear`, the plan's remove-day, and unticking a location
   (which silently strips it from saved routes). `save()` runs on every `all()`,
-  so nothing is recoverable. Hidden below 720px, but live on desktop.
+  so nothing is recoverable. Hidden below 720px, but live on desktop. Location
+  delete and route clear now ask; the rest do not.
+- **The locations list is the one row that is not finger-sized.** It is 289px
+  with four adjacent controls plus the name, and four 44px targets leave the
+  name 83px, at which "Santa Barbara Island" wraps to three lines. It needs the
+  detail-sheet restructure (M8) before it can carry the targets, so it is left
+  at its old sizes rather than made worse.
 - **Every network failure is silent.** Tides, ENC hazards and restricted areas,
   CDFW protected areas, ATON navaids, Nominatim and the elevation tiles all
   catch their errors and render nothing. There is no `tileerror` handler and no
