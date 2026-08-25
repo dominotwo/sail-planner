@@ -19,10 +19,10 @@
      1200x630 - the Dusk chart with the sample passage drawn, place names, leg
      distances and the "not for navigation" line - captured with the headless
      harness in dev/. Regenerate it the same way if the chart's look changes.
-     The path is relative because the public origin is not decided yet; most
-     scrapers resolve that against the page, but make it absolute once the site
-     has a domain, because some do not. -->
-<meta property="og:image" content="og.png">
+     Absolute, because a good number of scrapers will not resolve a relative
+     og:image against the page. It has to move if the site ever moves. -->
+<meta property="og:url" content="https://dominotwo.github.io/sail-planner/">
+<meta property="og:image" content="https://dominotwo.github.io/sail-planner/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="The Sail Planner chart, with a passage drawn from Newport Harbor out to Santa Barbara Island and back by way of Avalon.">
@@ -4381,7 +4381,20 @@ function seabedAt(lat,lon){
    about each one is measured here: depth from the raster, and shelter by casting
    rays until they hit land, which also gives the arc the swell comes in from. */
 const ANCH_TYPES=/^(bay|cove|harbour|harbor|marina|anchorage|inlet|lagoon)$/i;
-const anchCache=new Map();
+/* Persisted, so a second visit to the same water asks Nominatim nothing at all.
+   Five queries at one a second is five and a half seconds of waiting, and the
+   answers do not change - a cove is where it was last week. Capped and stored
+   under its own key rather than in S, which is saved on every render. */
+const ANCH_LS='sailplanner.anch.v1', ANCH_KEEP=40;
+const anchCache=(()=>{
+  try{
+    const raw=JSON.parse(lsGet(ANCH_LS)||'[]');
+    return new Map(Array.isArray(raw)? raw.slice(-ANCH_KEEP) : []);
+  }catch(e){ return new Map(); }
+})();
+function anchPersist(){
+  try{ lsSet(ANCH_LS, JSON.stringify([...anchCache].slice(-ANCH_KEEP))); }catch(e){}
+}
 /* degrees and decimal minutes — how a position is read off a chart or plotter */
 function posTxt(lat,lon){
   const f=(v,pos,neg)=>{ const a=Math.abs(v), d=Math.floor(a);
@@ -4447,7 +4460,13 @@ async function anchFetch(){
         if(!seen.has(id)) seen.set(id,{n:nm, lat:+f.lat, lon:+f.lon, t:f.type});
       });
     }catch(e){ anchFailed++; }
-    await new Promise(r=>setTimeout(r,120));
+    /* Nominatim's usage policy is one request a second. At 120ms these five
+       queries ran at about eight, which is the kind of thing that gets an
+       origin blocked rather than a user throttled - and this is a public site
+       now, so the origin is everyone. No email= parameter: that would put a
+       personal address in a public page for scrapers to find, and the Referer
+       the browser sends from the site's own domain is real identification. */
+    await new Promise(r=>setTimeout(r,1100));
   }
   const list=[...seen.values()].slice(0,60);
   /* five queries; all five failing is a network problem, some of them failing
@@ -4456,6 +4475,7 @@ async function anchFetch(){
   if(anchFailed>=5){ layerStatus('anchChk','Anchorage search didn\u2019t load.', ()=>anchRefresh()); return list; }
   layerStatus('anchChk', null);
   anchCache.set(key,list);
+  anchPersist();
   return list;
 }
 /* A place name sits at the head of its bay, often well ashore — a gazetteer point
@@ -4502,8 +4522,27 @@ function depthNear(lat,lon){
   }
   return null;
 }
+/* Anchorages are a close-in layer and were behaving like a whole-coast one.
+   Measured tile counts for the three elevLoad calls below - they pass explicit
+   zooms, so their budgets are never consulted and the count is a pure function
+   of how wide the view is:
+
+     zoom 12    57 tiles
+     zoom 10   173
+     zoom  8  1611     <- every one a fetch, a canvas decode and a Float32Array
+
+   A floor of 10 bounds it at 173, which is what the Bottom layer costs, and
+   loses nothing: sixty anchorages across the whole Bight is not a reading of
+   anything. Same treatment navaids got - it says why, where the switch is. */
+const ANCH_MIN_Z=10;
 async function anchRefresh(){
-  if(!S.lyrAnch){ anchList=[]; return; }
+  if(!S.lyrAnch){ anchList=[]; zoomHint('anchChk', null); return; }
+  if(map.getZoom()<ANCH_MIN_Z){
+    anchList=[]; setLayers();
+    zoomHint('anchChk','Anchorages draw in from zoom '+ANCH_MIN_Z+' — zoom in to see them.');
+    return;
+  }
+  zoomHint('anchChk', null);
   if(anchBusy) return;
   anchBusy=true;
   try{
