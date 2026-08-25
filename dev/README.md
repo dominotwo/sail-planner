@@ -22,6 +22,25 @@ This used to be `?ft=1` inside `index.html`. It came out because it was the only
 part of that page addressed to a developer rather than a sailor, and it shipped
 to everyone to sit there hidden.
 
+## `centring-audit.js`
+
+Are the marks inside the buttons actually centred? Run it per surface
+(`#side #dock #cmp #mx #ctrls`) at both widths.
+
+It judges **SVG content only**, deliberately.
+`Range.getBoundingClientRect()` measures the font's ascent/descent box rather
+than glyph ink, and Inter's ascent is bigger than its descent — so text that
+flexbox centres perfectly reports a ~1.8px offset every time, in every button,
+including plain words like "fit". That is typography, not a defect, and a check
+that cries wolf is a check nobody keeps running. An SVG has no such excuse.
+
+For text it asserts the *layout* instead: an icon-sized button has to use a
+centring display. Cheap, and it catches the real class of bug.
+
+The bug it was written for: a bare `<button>` carries the UA's `1px 6px`
+padding, so a 13px icon was centring inside an 8px content box and sitting
+2.5px off. A text glyph never showed it; an SVG did.
+
 ## `og-capture.js`
 
 The setup script that produced `og.png`, the link-preview card. Injected before

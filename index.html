@@ -752,8 +752,10 @@
   .dsub { color:var(--muted-2); font-size:11px; }
   .iconx {
     /* padding:0 — a bare <button> carries the UA's 1px 6px, which left a 13px
-       icon centring inside an 8px content box and sitting 2.5px off. A text
-       glyph never showed it; an SVG does. */
+       icon centring inside an 8px content box and sitting 2.5px off.
+       Every one of these carries an SVG rather than a glyph, because "×" sits
+       on the x-height and centres in its own em box, not in the button: as text
+       it read a couple of pixels high next to the maximise icon beside it. */
     padding:0;
     margin-left:auto; width:22px; height:22px; display:grid; place-items:center; cursor:pointer; flex:none;
     background:transparent; border:1px solid var(--line); border-radius:var(--radius-sm);
@@ -805,11 +807,8 @@
        min-width:0 and an ellipsis for exactly this. */
     flex-wrap:nowrap;
   }
-  /* 90px of the header for a display preference you set once. Without it the
-     route name has 117px and is readable; with it, it ellipsised to 23. */
-  .drawer[data-max="true"] .seg.tiny { display:none; }
-  .drawer[data-max="true"] .pstep { display:none; }
-  .drawer[data-max="true"] .pdep { grid-template-columns:1fr; }
+
+  /* the ±15min steps are gone on the phone, so this is the phone block's job */
   .drawer[data-max="true"] .ptime { min-height:0; padding:1px 5px; }
   .drawer[data-max="true"] .pleg { padding:var(--space-1) 0; row-gap:1px; }
   /* the rest of the compression is not maximised-only — see the phone block */
@@ -1414,7 +1413,12 @@
        give-a-day-back button, the button drops to its own line and the row goes
        88px -> 100px (108 at 360px). The name is the heading face at 500 against
        12px muted numbers, which is what makes it read - not another point. */
-    .pleg-nm { flex:1 1 auto; min-width:0; white-space:normal; }
+    /* The name claims line 1 outright - the grip and the give-a-day-back button
+       are the only things that fit beside it - so the departure always starts
+       line 2 rather than depending on being too wide to fit. It used to depend
+       on exactly that, and when the departure became a flexible native control
+       it stopped being too wide and slid up beside the name at 10px. */
+    .pleg-nm { flex:1 1 calc(100% - 46px); min-width:0; white-space:normal; }
     /* 30px box, 44px reach. At a real 44x44 this button alone set line 1's
        height and the row went 76px -> 102px; the two other things on that line
        - the grip and the name - are 18px and neither is a tap target, so the
@@ -1430,8 +1434,19 @@
       width:var(--tap); height:var(--tap);
     }
     .pleg .pdep, .pleg .pleg-arr, .pleg .pleg-h { order:1; }
-    .pleg .pdep { flex:0 0 auto; }
-    .pleg .ptime { width:56px; min-width:0; text-align:center; }
+    /* The departure flexes rather than being told a width. A native time input
+       renders in the DEVICE's clock format, not the app's, so its content width
+       is not something this file can know - "9:00 AM" wants ~116px where
+       "09:00" wants 90. Fixing a width meant one of the two wrapped the row.
+       Flexing, the field takes whatever line 2 has spare and neither wraps. */
+    /* 120px and flex:none. A flexible basis cannot work here: at `auto` the
+       field claims its ~127px content width and the row wraps to three lines;
+       at 0 it never forces a wrap at all and slides up beside the name at
+       10px wide. A width the row can afford is the only deterministic answer -
+       120 fits a native picker in either clock format and leaves line 2 at
+       235px of 282. */
+    .pleg .pdep { flex:0 0 auto; min-width:0; }
+    .pleg .ptime { width:120px; min-width:0; text-align:center; }
     /* Without the column header the three times read as three unlabelled
        numbers. An arrow and a separator carry what "Depart / Arrive / Under way"
        used to: 08:00 -> 18:48 . 10:49. */
@@ -1485,7 +1500,14 @@
     /* the PLAN dock's title only. Compare's header is just its title and the
        minimize button - hide the title there and it is an unlabelled bar. */
     #planTop .dttl { display:none; }
-    .drawer-top .proute { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    /* On a phone .dttl is hidden, so this IS the dock's title and it was
+       carrying only the accent colour to say so. 16px and a weight, which is a
+       step above the 13.5px the other dock titles take — it is the one piece of
+       identity in a header that is otherwise all controls. */
+    .drawer-top .proute {
+      flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      font-size:16px; font-weight:500;
+    }
 
     /* the stop and day rows stop advertising a grab they can't honour */
     .rleg, .pleg { cursor:default; }
@@ -1544,10 +1566,6 @@
     .loc-coords .input  { font-size:16px; width:104px; padding:2px 5px; }
     .phead .ptime       { width:158px; }     /* a full date plus its picker glyph */
     .phead .hm          { width:76px; }
-    .pleg .ptime        { width:76px; }
-    /* "11:00 am" is wider than "09:00" and was being cut to "11:00 an". A
-       departure you cannot read is worse than a row that wraps. */
-    :root[data-clock="12"] .pleg .ptime { width:90px; }
     .loc-edit, .rt-edit { padding:2px 6px; }
   }
 
@@ -1608,8 +1626,14 @@
        track and sat underneath the time field - the field won elementFromPoint
        and half the button did nothing. The template moves with the button, the
        same coupling .rleg and .pleg carry a warning about. */
-    .pdep { grid-template-columns:44px 1fr 44px; gap:2px; }
-    .pstep { width:44px; height:44px; font-size:16px; }
+    /* The ±15min steps go on the phone. They were 88px of the row's width and
+       their 44px targets were its whole height, and the departure is a native
+       time picker now - a wheel, not a text field - so nudging by a quarter
+       hour is a tap and a flick rather than a thing that needs its own pair of
+       buttons. minmax(0,1fr) because a native time input has a ~116px
+       min-content width and an auto-minimum track cannot go below it. */
+    .pstep { display:none; }
+    .pdep { grid-template-columns:minmax(0,1fr); gap:0; }
     /* ---- vertical compression, every view ----
        These cost nothing. The two buttons keep their full 44px reach, because
        the pseudo is centred on the box and does not care how big the box is;
@@ -2066,6 +2090,17 @@
               </label>
             </div>
           </div>
+          <!-- Clock notation is a display preference like the palette and the
+               units, and it lived in the plan dock's header taking 90px of
+               342 - which is what stopped the route name being readable
+               there. This is where the rest of them already are. -->
+          <div class="ctrl-row">
+            <span class="ctl-l">Clock</span>
+            <div class="seg" id="clockSeg" title="Clock notation used throughout the plan">
+              <label class="seg-opt"><input type="radio" name="clock" value="24">24 h</label>
+              <label class="seg-opt"><input type="radio" name="clock" value="12">12 h</label>
+            </div>
+          </div>
           <div class="ctrl-row">
             <span class="ctl-l">Chart</span>
             <div class="seg" id="palSeg">
@@ -2118,7 +2153,7 @@
             <label class="seg-opt"><input type="radio" name="mxmode" value="dist" checked>Distance</label>
             <label class="seg-opt"><input type="radio" name="mxmode" value="time">Time</label>
           </div>
-          <button class="iconx" id="mxClose" title="Close the matrix" aria-label="Close the matrix">×</button>
+          <button class="iconx" id="mxClose" title="Close the matrix" aria-label="Close the matrix"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
         </div>
         <div class="float-b"><div class="mx-note" id="mxNote"></div><div id="mxWrap"></div></div>
       </aside>
@@ -2128,7 +2163,7 @@
       <div class="drawer-top" id="drawerTop" title="Drag to resize — double-click to fit the content">
         <span class="dttl">Compare routes</span>
         <span class="dsub" id="cmpSub"></span>
-        <button class="iconx" data-hide="1" title="Close" aria-label="Close">×</button>
+        <button class="iconx" data-hide="1" title="Close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
       </div>
       <div class="drawer-b">
         <section class="pane" id="paneCompare" data-pane="compare">
@@ -2142,10 +2177,6 @@
         <span class="dttl">Plan by day</span>
         <span class="dsub" id="planSub"></span>
         <span class="proute" id="planRoute"></span>
-        <div class="seg tiny" id="clockSeg" title="Clock notation used throughout the plan">
-          <label class="seg-opt"><input type="radio" name="clock" value="24">24 h</label>
-          <label class="seg-opt"><input type="radio" name="clock" value="12">12 h</label>
-        </div>
         <span class="pexp">
           <button class="btn btn-ghost mini" id="planExp" aria-expanded="false" aria-haspopup="true" title="Download this plan">Export</button>
           <span class="pexp-menu" id="planExpMenu" hidden>
@@ -2161,7 +2192,7 @@
             <path d="M5 1 V5 H1 M13 5 H9 V1 M9 13 V9 H13 M1 9 H5 V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </button>
-        <button class="iconx" data-hide="1" title="Close" aria-label="Close">×</button>
+        <button class="iconx" data-hide="1" title="Close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
       </div>
       <div class="drawer-b">
         <section class="pane" id="panePlan" data-pane="plan">
@@ -3433,7 +3464,7 @@ function renderLocSheet(){
     <div class="sheet-h">
       <span class="pin-no">${codeOf(l)}</span>
       <input class="input loc-edit" id="sheetName" value="${l.name}" data-id="${l.id}" aria-label="Name this location">
-      <button class="iconx" data-sheet="close" title="Close" aria-label="Close">\u00d7</button>
+      <button class="iconx" data-sheet="close" title="Close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
     </div>
     <div class="sheet-coords">
       <label>Lat<input class="input" data-cid="${l.id}" data-k="lat" value="${l.lat}" inputmode="decimal"></label>
@@ -5010,9 +5041,19 @@ function setPeek(v, btn){
   document.querySelectorAll('.rbtn').forEach(b=>b.setAttribute('aria-current', b.dataset.rail===v));
 }
 document.getElementById('rail').addEventListener('mouseover', e=>{
+  /* Peeking is a hover gesture and it closes on mouseleave. A tap fires the
+     synthetic mouseover and never the leave, so on touch the panel opened and
+     stayed open with nothing to dismiss it. A finger gets the full sidebar
+     from the click handler instead, which is what it wanted anyway. */
+  if(!window.matchMedia('(hover:hover)').matches) return;
   const b=e.target.closest('[data-rail]');
   if(!b || !S.collapsed) return;
   if(b.dataset.rail==='open') setPeek(null); else setPeek(b.dataset.rail, b);
+});
+/* and two ways out that do not depend on the pointer ever leaving */
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && appEl.dataset.peek) setPeek(null); });
+document.addEventListener('pointerdown', e=>{
+  if(appEl.dataset.peek && !e.target.closest('.sidecol')) setPeek(null);
 });
 document.querySelector('.sidecol').addEventListener('mouseleave', ()=>{
   peekT=setTimeout(()=>setPeek(null),160);
@@ -6152,7 +6193,7 @@ function renderPlan(){
         <span class="pleg-nm">${g.B.name} <small>from ${g.A.name}</small></span>
         <span class="pdep">
           <button class="pstep" data-pact="dep-" data-leg="${g.i}" tabindex="-1" aria-label="15 minutes earlier">\u2212</button>
-          <input class="ptime hm" type="text" inputmode="numeric" maxlength="8" value="${HHMM(g.dep)}" data-ptime="${g.i}" aria-label="Departure time">
+          <input class="ptime hm" type="time" value="${CLK(g.dep)}" data-ptime="${g.i}" aria-label="Departure time">
           <button class="pstep" data-pact="dep+" data-leg="${g.i}" tabindex="-1" aria-label="15 minutes later">+</button>
         </span>
         <span class="pleg-arr${g.night?' night':''}" title="${g.night?'Arrives after dark':'Arrives in daylight'}${g.dk>0.05? ' \u00b7 '+hrsTxt(g.dk)+' of the leg in the dark':''}">${HHMM(g.arr)}</span>

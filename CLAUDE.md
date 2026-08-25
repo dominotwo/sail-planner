@@ -171,9 +171,34 @@ exists. Open it on the device if the chart ever stops toning on iOS. It used to
 be `?ft=1` inside `index.html`; it is out of the shipped page because it was
 the only part of it addressed to a developer rather than a sailor.
 
+## Standing checks
+`dev/` holds the scripts. Run them per surface at both widths before calling a
+UI change done.
+
+- **`centring-audit.js`** — are the marks inside the buttons centred, and is
+  every icon-sized button using a layout that centres? It judges **SVG only**,
+  on purpose: `Range.getBoundingClientRect()` measures the font's
+  ascent/descent box, not glyph ink, so text that flexbox centres perfectly
+  reports a ~1.8px offset every time. A check that cries wolf is one nobody
+  keeps running.
+- The hit-test audit (walk out from a control's centre until
+  `elementFromPoint` stops resolving to it) for the 44px minimum.
+- `scrollWidth` vs `clientWidth` on every pane, for sideways scroll nobody
+  asked for.
+
 ## Traps this file has already sprung
 Each of these cost a debugging round. They are all still live.
 
+- **A flex container that wraps will wrap before it shrinks.** `flex-wrap:wrap`
+  means an item keeps its basis and pushes the next one to a new line rather
+  than giving up width. Bitten three times: the dock header's close button, the
+  route name in it, and the plan's departure field. If something should shrink,
+  it needs `nowrap` or a basis the line can afford — and `flex-basis:0` is not
+  that answer, because an item that always fits never forces the wrap the
+  layout depended on.
+- **`type="time"` renders in the DEVICE's clock format, not the app's**, and has
+  a ~116px min-content width. A grid track holding one needs `minmax(0,1fr)`,
+  and its width cannot be derived from `S.clock24`.
 - **Hiding a grid child shifts every later sibling one track left**, and a child
   bigger than its track overflows the row by exactly the difference. `.rleg`,
   `.pleg`, `.pdep` and `.pcols` all carry hand-tuned templates. **Change the
