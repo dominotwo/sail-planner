@@ -8,11 +8,11 @@
      landscape. See the --safe-* tokens. Nothing sets user-scalable, so
      pinch-zoom stays available. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sail Planner — Southern California Bight</title>
+<title>Catalina Wine and Cheese Fest v12 — Southern California Bight</title>
 <meta name="description" content="Plan sailing legs across the Southern California Bight: distance and sail time between harbours and Channel Islands anchorages, wind and tacking factored in, with route comparison.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161826'/%3E%3Cpath d='M16 6 L20.5 22 H11.5 Z' fill='%239184d9'/%3E%3Cpath d='M7 25 h18' stroke='%239184d9' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Sail Planner — Southern California Bight">
+<meta property="og:title" content="Catalina Wine and Cheese Fest v12 — Southern California Bight">
 <meta property="og:description" content="Distances, sail time, weather windows and a day-by-day plan for the Channel Islands. Planning only — not for navigation.">
 <!-- twitter:card promised a large image and there was none, so a link texted
      between crew previewed as a bare text card. og.png is the app itself at
@@ -25,8 +25,20 @@
 <meta property="og:image" content="https://dominotwo.github.io/sail-planner/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The Sail Planner chart, with a passage drawn from Newport Harbor out to Santa Barbara Island and back by way of Avalon.">
+<meta property="og:image:alt" content="The Catalina Wine and Cheese Fest v12 chart, with a passage drawn from Newport Harbor out to Santa Barbara Island and back by way of Avalon.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://dominotwo.github.io/sail-planner/">
+<!-- Kept in step with the palette by all(); this is the value Dusk uses, so the
+     browser chrome matches the chart from the first paint rather than after the
+     first render. -->
+<meta name="theme-color" id="themeColor" content="#161826">
+<!-- Add to Home Screen. Without these it takes the page title and a screenshot
+     of the favicon, on the device this was built for. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wine &amp; Cheese">
 <!-- Leaflet and Inter are vendored under vendor/ (provenance and refresh steps in
      vendor/README.md). Everything needed to render is same-origin, so there is no
      CDN on the critical path: three render-blocking cross-origin requests become
@@ -43,6 +55,28 @@
 <script src="vendor/leaflet/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; }
+
+  /* Off screen until it has focus, then the first thing on it. */
+  .skip {
+    position:fixed; left:var(--space-4); top:-100px; z-index:2000;
+    background:var(--color-surface); color:var(--color-text);
+    border:1px solid var(--ac); border-radius:var(--radius-md);
+    padding:var(--space-3) var(--space-4); font-size:13px; text-decoration:none;
+    transition:top .12s;
+  }
+  .skip:focus { top:var(--space-4); }
+
+  /* The page is entirely JavaScript and there is no server behind it, so with
+     scripting off there is nothing to degrade to — say that rather than show a
+     frame with nothing in it. */
+  .noscript {
+    max-width:44rem; margin:0 auto; padding:14vh var(--space-6) 0;
+    color:var(--color-text); font-size:16px; line-height:1.6;
+  }
+  .noscript h2 { font-family:var(--font-heading); font-size:24px; letter-spacing:-.02em; margin:0 0 var(--space-4); }
+  .noscript p { margin:0 0 var(--space-4); color:var(--muted); }
+  .noscript-warn { color:var(--warn-t) !important; }
+
 
   :root {
     /* What the hardware takes out of the viewport: the notch or Dynamic Island
@@ -235,8 +269,21 @@
   /* ---------- sidebar ---------- */
   .side { border-right:0; display:flex; flex-direction:column; min-height:0; min-width:0; flex:1; background:var(--color-bg); }
   .side-head { padding: var(--space-6) var(--space-6) var(--space-4); }
-  .brand { font-family:var(--font-heading); font-weight:500; font-size:19px; letter-spacing:-0.02em; }
-  .brand-sub { color:var(--muted); font-size:11.5px; margin-top:2px; }
+  /* The name read as a panel label: 19px at the same weight and colour as the
+     row beneath it, with nothing to mark it as the thing the page is called.
+     Bigger, heavier, tighter, and with the sail from the favicon beside it. */
+  .brand-wrap { display:flex; align-items:flex-start; gap:var(--space-3); min-width:0; }
+  .brand-mark { width:26px; height:26px; flex:none; color:var(--ac); margin-top:1px; }
+  .brand-txt { min-width:0; }
+  .brand {
+    font-family:var(--font-heading); font-weight:600; font-size:22px;
+    letter-spacing:-0.025em; line-height:1.12; margin:0; text-wrap:balance;
+    color:var(--color-text);
+  }
+  .brand-sub {
+    color:var(--muted); font-size:11.5px; margin-top:3px;
+    letter-spacing:.02em;
+  }
   /* the sidebar runs to the bottom of the screen, so its last row is what the
      home indicator covers when nothing else is open */
   .side-scroll { overflow-y:auto; flex:1; min-height:0;
@@ -1764,6 +1811,21 @@
     </feComponentTransfer>
   </filter>
 </svg>
+<!-- Skip link. The sidebar is a long list of controls and the chart is the
+     point of the page; without this a keyboard reaches it last. -->
+<a class="skip" href="#map">Skip to the chart</a>
+<noscript>
+  <!-- the shell renders as empty chrome without its script, so it goes -->
+  <style>.app, .skip { display:none !important; }</style>
+  <div class="noscript">
+    <h2>This one needs JavaScript.</h2>
+    <p>Catalina Wine and Cheese Fest v12 works out distances threaded around the islands, sail time
+    against a wind you set, and a day-by-day plan with sun, moon and tide — all
+    of it in the browser, with no server to fall back on. With scripting off
+    there is nothing to show you.</p>
+    <p class="noscript-warn">Planning only — not for navigation. Carry the chart.</p>
+  </div>
+</noscript>
 <div class="app" id="app" data-collapsed="false">
   <div class="sidecol">
   <nav class="rail" id="rail" aria-label="Panel">
@@ -1781,15 +1843,23 @@
     </button>
   </nav>
   <aside class="side" id="side">
-    <div class="side-head">
-      <div>
-        <div class="brand">Sail Planner</div>
-        <div class="brand-sub">Southern California Bight</div>
+    <header class="side-head">
+      <div class="brand-wrap">
+        <!-- the mark was only ever in the favicon; on the page the name had
+             nothing to distinguish it from a section label -->
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 4 L21.5 23 H10.5 Z" fill="currentColor"/>
+          <path d="M5.5 27 h21" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+        </svg>
+        <div class="brand-txt">
+          <h1 class="brand">Catalina Wine and Cheese Fest v12</h1>
+          <div class="brand-sub">Southern California Bight</div>
+        </div>
       </div>
       <button class="btn btn-ghost mini" id="collapseBtn" title="Collapse panel" aria-label="Collapse panel">
         <svg width="14" height="14" viewBox="0 0 14 14"><path d="M10 2 L5 7 L10 12" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       </button>
-    </div>
+    </header>
     <div class="side-scroll">
       <section class="sec" data-sec="locList">
       <div class="sec-label"><span>Locations</span><span style="display:flex;gap:2px;align-items:center;letter-spacing:0"><button class="btn btn-ghost mini" id="mxBtn" title="Distance and time between every pair" aria-pressed="false">matrix</button><button class="btn btn-ghost mini" id="fitAll" title="Fit all on the map">fit</button><span id="selCount"></span></span></div>
@@ -1841,7 +1911,7 @@
       <div class="hint" id="hint">Click the map to drop a new location · Esc to cancel</div>
       <div class="botread" id="botRead" hidden></div>
       <div class="welcome" id="welcome" data-on="false">
-        <div class="wtitle">Sail Planner</div>
+        <div class="wtitle">Catalina Wine and Cheese Fest v12</div>
         <div class="wsub">Distances, sail time and a day-by-day plan for the Southern California Bight.</div>
         <ol class="wsteps">
           <li>A sample passage is already drawn — Newport out to Emerald Bay, Santa Barbara Island and Avalon.</li>
@@ -4365,7 +4435,11 @@ async function bottomRefresh(){
    than leaving the checkbox looking like it did nothing. */
 function botBusyUI(on){
   const el=document.getElementById('botChk');
-  if(el && el.parentElement) el.parentElement.classList.toggle('busy', !!on);
+  if(el && el.parentElement){
+    el.parentElement.classList.toggle('busy', !!on);
+    /* the "…" is a CSS pseudo-element, which a screen reader cannot see */
+    el.parentElement.setAttribute('aria-busy', on? 'true':'false');
+  }
 }
 function seabedAt(lat,lon){
   if(!botGrid) return null;
@@ -4629,7 +4703,14 @@ function statusAfter(label, msg, retry, tone){
   let el=label.nextElementSibling;
   const has = el && el.classList && el.classList.contains('lyr-err');
   if(!msg){ if(has) el.remove(); return; }
-  if(!has){ el=document.createElement('div'); label.after(el); }
+  if(!has){
+    el=document.createElement('div');
+    /* polite, so a layer failing is announced without interrupting whatever is
+       being read — these appear while you are looking at the chart, not at the
+       switch that produced them */
+    el.setAttribute('role','status'); el.setAttribute('aria-live','polite');
+    label.after(el);
+  }
   el.className = 'lyr-err' + (tone==='hint'? ' hint' : '');
   el.textContent=msg+' ';
   if(retry){
@@ -4921,7 +5002,7 @@ document.getElementById('gpxBtn').addEventListener('click', ()=>{
   const pts=S.route.map(id=>byId(id)).filter(Boolean);
   const esc=s=>s.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
   const gpx=`<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Sail Planner" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Catalina Wine and Cheese Fest v12" xmlns="http://www.topografix.com/GPX/1/1">
   <rte><name>${esc(r.name)}</name>
 ${pts.map(p=>`    <rtept lat="${p.lat}" lon="${p.lon}"><name>${esc(p.name)}</name></rtept>`).join('\n')}
   </rte>
@@ -4993,7 +5074,7 @@ document.getElementById('planIcs').addEventListener('click', ()=>{
   const stamp = new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+Z$/,'Z');
   const esc = s => String(s).replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
   const fold = l => l.length<=74? l : l.match(/.{1,74}/g).join('\r\n ');
-  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Sail Planner//Plan//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Catalina Wine and Cheese Fest v12//Plan//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
            'X-WR-CALNAME:'+esc(x.r.name+' — sailing plan')];
   x.S2.days.forEach(d=>{
     const sun = d.sun&&d.sun.rise? 'Sunrise '+CLK(d.sun.rise)+', sunset '+CLK(d.sun.set) : '';
@@ -6000,6 +6081,10 @@ function planEdit(fn){
 }
 function all(){
   document.documentElement.dataset.pal = S.pal;
+  /* the browser's own chrome is part of the page on a phone; leaving it at one
+     colour while the chart switches between three is the visible seam */
+  const tc=document.getElementById('themeColor');
+  if(tc) tc.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim() || '#161826');
   document.documentElement.dataset.topo = S.topo? 'true':'false';
   appEl.dataset.collapsed = S.collapsed? 'true':'false';
   mxFloat.dataset.open = S.mxOpen? 'true':'false';
