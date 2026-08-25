@@ -14,6 +14,18 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Sail Planner — Southern California Bight">
 <meta property="og:description" content="Distances, sail time, weather windows and a day-by-day plan for the Channel Islands. Planning only — not for navigation.">
+<!-- twitter:card promised a large image and there was none, so a link texted
+     between crew previewed as a bare text card. og.png is the app itself at
+     1200x630 - the Dusk chart with the sample passage drawn, place names, leg
+     distances and the "not for navigation" line - captured with the headless
+     harness in dev/. Regenerate it the same way if the chart's look changes.
+     The path is relative because the public origin is not decided yet; most
+     scrapers resolve that against the page, but make it absolute once the site
+     has a domain, because some do not. -->
+<meta property="og:image" content="og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Sail Planner chart, with a passage drawn from Newport Harbor out to Santa Barbara Island and back by way of Avalon.">
 <meta name="twitter:card" content="summary_large_image">
 <!-- Leaflet and Inter are vendored under vendor/ (provenance and refresh steps in
      vendor/README.md). Everything needed to render is same-origin, so there is no
@@ -514,7 +526,6 @@
   /* the isobaths are hairlines in the source tiles — a second offset copy of the
      same layer thickens them enough to read against the relief */
   .leaflet-lines2-pane { filter: var(--tile-lines, none); transform:translate(1px,1px); opacity:.8; }
-  .zhint { grid-column:1/-1; color:var(--ac-soft); font-size:10.5px; letter-spacing:.02em; }
   .leaflet-mark-pane { filter:none; }
   /* A wrapping flex row packs each line to its own content, so the second row's
      boxes never line up under the first. A grid gives them columns. */
@@ -528,6 +539,8 @@
     padding:1px 0 4px;
   }
   .lyr-err .btn { color:var(--ac-soft); }
+  /* the same box in a neutral tone: "not yet" rather than "went wrong" */
+  .lyr-err.hint { color:var(--ac-soft); }
   .chk { display:flex; align-items:center; gap:var(--space-3); font-size:11.5px; color:var(--muted); cursor:pointer; padding:3px 0; min-height:22px; }
   .chk:hover { color:var(--ac-soft); }
   /* a layer that is fetching: the label says so instead of the tick looking inert */
@@ -1165,7 +1178,7 @@
        Desktop is untouched: every rule here is inside the width query. */
 
     /* 1 - the floor. Micro-labels, badges and axis ticks land on it. */
-    .ctl-l, .phead-l, .sec-label, .legend-t, .zhint, .coord-hint,
+    .ctl-l, .phead-l, .sec-label, .legend-t, .coord-hint,
     .loc-coords label, .pslack, .ptide-wait, .ptide-e,
     .pin-no, .pin-seq, .cmpflag,
     table.cmp th.lg, table.cmp th.sub, .cmp .tk, .cmp.nar .nrn,
@@ -3404,8 +3417,13 @@ function atonColor(p){
 }
 function atonLit(p){ return !!(p.characteristics && /fl|oc|iso|q|mo|f\b/i.test(p.characteristics)); }
 async function atonRefresh(){
-  if(!S.marks){ if(atonLayer){ map.removeLayer(atonLayer); atonLayer=null; } return; }
-  if(map.getZoom()<9){ if(atonLayer) atonLayer.clearLayers(); return; }
+  if(!S.marks){ if(atonLayer){ map.removeLayer(atonLayer); atonLayer=null; } zoomHint('marksChk', null); return; }
+  if(map.getZoom()<9){
+    if(atonLayer) atonLayer.clearLayers();
+    zoomHint('marksChk','Navaids draw in from zoom 9 — zoom in to see them.');
+    return;
+  }
+  zoomHint('marksChk', null);
   const b=map.getBounds().pad(.15);
   const box=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v=>v.toFixed(2)).join(',');
   const tok=++atonToken;
@@ -4545,12 +4563,21 @@ function layerStatus(inputId, msg, retry){
   const inp=document.getElementById(inputId); if(!inp) return;
   statusAfter(inp.closest('.chk'), msg, retry);
 }
-function statusAfter(label, msg, retry){
+/* M13: a layer with a zoom floor draws nothing below it and said nothing about
+   why. Not a failure - there is nothing to retry - so it takes the neutral
+   tone. Cleared as soon as the floor is crossed, by the same refresh that
+   would have drawn the layer. */
+function zoomHint(inputId, msg){
+  const inp=document.getElementById(inputId); if(!inp) return;
+  statusAfter(inp.closest('.chk'), msg, null, 'hint');
+}
+function statusAfter(label, msg, retry, tone){
   if(!label) return;
   let el=label.nextElementSibling;
   const has = el && el.classList && el.classList.contains('lyr-err');
   if(!msg){ if(has) el.remove(); return; }
-  if(!has){ el=document.createElement('div'); el.className='lyr-err'; label.after(el); }
+  if(!has){ el=document.createElement('div'); label.after(el); }
+  el.className = 'lyr-err' + (tone==='hint'? ' hint' : '');
   el.textContent=msg+' ';
   if(retry){
     const b=document.createElement('button');
