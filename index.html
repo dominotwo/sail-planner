@@ -1127,6 +1127,24 @@
        times and the actions 6px over one line. Both gaps tighten. */
     .pday-h { flex-wrap:wrap; row-gap:var(--space-1); gap:var(--space-2); }
     .pday-sky { gap:var(--space-2); }
+    /* The note is 58px of a 482px dock - a third of everything above the first
+       day. The second sentence goes: dragging a leg along the day bar is the
+       finer of the two gestures and the harder to do with a thumb, and the
+       sentence that stays is the one that explains the button in every row. */
+    .pnote-2 { display:none; }
+
+    /* Vertical trim, measured against a 240px day block. Each of these was
+       holding nothing. The tide curve's 13px margins are NOT in this list -
+       they are what its height labels sit in, 12px out.
+       The +/x pair did measure 44x37 after this, and the reason was not the
+       trim: their reach extends 7px past their box into .pscale, a later
+       sibling that painted over the pseudo. Widening the padding back would
+       have "fixed" it by coincidence and cost 2.8px a day; the fix is z-index
+       on the button. Re-run the hit audit after touching either. */
+    .pday  { padding:var(--space-1) 0 var(--space-2); }
+    .pleg  { padding:var(--space-1) 0; }
+    .pscale { margin-top:0; }
+    .pbarw { margin-bottom:0; }
     /* The header's fixed items - title, clock toggle, csv/ics, close - came to
        309px of the 342 available once they were finger-sized, so the close and
        export buttons wrapped to a second line and the route name had nothing
@@ -1260,8 +1278,30 @@
        same coupling .rleg and .pleg carry a warning about. */
     .pdep { grid-template-columns:44px 1fr 44px; gap:2px; }
     .pstep { width:44px; height:44px; font-size:16px; }
-    .pday-act { gap:var(--space-2); }
-    .pday-act .btn { width:44px; height:44px; font-size:15px; }
+    /* 30px boxes, 44px reach - the same trade .pleg's give-a-day-back button
+       makes. At a real 44x44 this pair was the tallest thing in the day header
+       and set it to 44px on its own, while nothing else on that line is over
+       20px. The 14px gap is not cosmetic: two 30px boxes 5.6px apart have their
+       44px reaches overlapping by 8px, so the midpoint between + and x would
+       resolve to whichever painted last - the trap the route arrows sprang. At
+       14 they meet exactly and each keeps its own half. */
+    .pday-act { gap:14px; }
+    /* .btn.mini, not .btn: the blanket `.btn.mini { min-width:44px }` below is
+       two classes and sits later in this block, so a two-class selector here
+       loses to it - the gap applied and the size did not. Three classes wins,
+       which is the form .pleg's button already uses. */
+    .pday-act .btn.mini {
+      min-width:0; min-height:0; width:30px; height:30px; font-size:15px;
+      /* z-index, because the reach extends 7px past the box into .pscale - a
+         later sibling, so it painted over the pseudo and elementFromPoint gave
+         the axis strip. The axis is not interactive, so nothing is taken from
+         it. Without this the pair measures 44x37. */
+      position:relative; z-index:1;
+    }
+    .pday-act .btn.mini::after {
+      content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:var(--tap); height:var(--tap);
+    }
     .iconx { width:44px; height:44px; font-size:16px; }
     .cmpx { width:44px; height:44px; font-size:15px; }
     .seg-opt { min-width:44px; justify-content:center; }
@@ -5229,7 +5269,7 @@ function renderPlan(){
         <input type="checkbox" id="planTide"${S.tides?' checked':''}>Tides
       </label>
     </div>
-    <div class="pnote">Drag a leg onto another day to sail two in one push; \u21a7 gives it a day back. Drag a leg on the day bar to shift its departure.</div>
+    <div class="pnote">Drag a leg onto another day to sail two in one push; \u21a7 gives it a day back.<span class="pnote-2"> Drag a leg on the day bar to shift its departure.</span></div>
     <div class="pcols"><span></span><span>Leg</span><span>Depart</span><span>Arrive</span><span>Under way</span><span></span></div>
     ${html}`;
   if(sub) sub.textContent = days.length+' day'+(days.length===1?'':'s')
