@@ -64,6 +64,7 @@
      --------------------------------------------------------------- */
   :root, :root[data-pal="dusk"] {
     --panel:#0e0f18;
+    --edge-shadow:rgba(0,0,0,.5);        /* the fade at a sideways-scrolling edge */
     --line:var(--color-neutral-900); --line-2:#21232f;
     --muted:var(--color-neutral-400); --muted-2:var(--color-neutral-500);
     --ac:var(--color-accent); --ac-soft:var(--color-accent-300);
@@ -81,6 +82,7 @@
     --ctl-bg:#1c1e2b; --ctl-bg-h:#262938; --row-h:#1d1f2e;
   }
   :root[data-pal="day"] {
+    --edge-shadow:rgba(25,27,38,.20);    /* ink, not black, on a light ground */
     --color-bg:var(--color-neutral-100); --color-surface:var(--color-neutral-200);
     --color-text:var(--color-neutral-900);
     --color-accent:#5d5294;            /* accent-700: the accent on a light ground */
@@ -123,6 +125,7 @@
   :root[data-base="sat"][data-pal="dusk"]  { --tile: url(#tileDusk); }
   :root[data-base="sat"][data-pal="night"] { --tile: url(#tileNight); }
   :root[data-pal="night"] {
+    --edge-shadow:rgba(0,0,0,.55);
     --color-bg:#0b0705; --color-surface:#150c09; --color-text:#d8a184;
     --color-accent:#c2643c; --color-divider:#2a1712;
     --panel:#070403;
@@ -922,6 +925,35 @@
      which raises a scrollbar and takes 15px back, so the squeeze was sizing
      against a width the pane never gets. Reserving the gutter makes the two
      measurements the same width. */
+  /* ---------------- M9: a sideways scroll that says so ----------------
+     The compare table holds 315px in a 293px pane and nothing said there was
+     more; the matrix hides about 100px.
+
+     An overlay, not a background. The CSS background-attachment trick is the
+     tidy way to do this and it does not work here: backgrounds paint behind
+     content, and these tables give their cells their own backgrounds, so the
+     shadow is hidden exactly where the table is. Measured with the shadow set
+     to opaque red - it reached the screen in a 7px sliver between rows.
+
+     So the fade sits on the wrapper that does NOT scroll - the dock body, or
+     the float below its header - and JS says which edges have more behind
+     them. --edge-shadow is per palette: black on the two dark tables, ink on
+     Day, where black would read as grime. */
+  /* .drawer-b only. .float is position:absolute as a window and this rule sits
+     after that one - setting it relative here put the float back in flow and
+     837px wide. It gets `relative` inside the phone block instead, where it is
+     a static dock and needs a positioned ancestor for its fades. */
+  .drawer-b { position:relative; }
+  .drawer-b::before, .drawer-b::after,
+  .float::before, .float::after {
+    content:""; position:absolute; top:var(--fhead, 0px); bottom:0; width:22px;
+    pointer-events:none; opacity:0; transition:opacity .16s; z-index:5;
+  }
+  .drawer-b::before, .float::before { left:0;  background:linear-gradient(to right, var(--edge-shadow), transparent); }
+  .drawer-b::after,  .float::after  { right:0; background:linear-gradient(to left,  var(--edge-shadow), transparent); }
+  [data-fade-l]::before { opacity:1; }
+  [data-fade-r]::after  { opacity:1; }
+
   .pane { min-width:0; flex:1 1 auto; overflow:auto; scrollbar-gutter:stable; }
   .pane-h { display:none; }
 
@@ -1042,7 +1074,7 @@
        and the caps. fitFloat's inline top and max-width are cleared by mxHome,
        or they would outrank all of this. */
     .float {
-      position:static; order:9; flex:none;
+      position:relative; order:9; flex:none;
       left:auto; top:auto; max-width:none; max-height:none;
       border:0; border-top:1px solid var(--line); border-radius:0;
       box-shadow:none; backdrop-filter:none; background:var(--color-bg);
@@ -5248,9 +5280,47 @@ function fitToContent(self){
   setDockSize(self, Math.max(110, Math.min(need, availBody(self))));
   fitDocks(); map.invalidateSize({pan:false}); save();
 }
+/* ---------------- M9: which edges have more behind them ----------------
+   Each scroller reports to the wrapper that holds its fades - the dock body,
+   or the float, whose fades start below its header (--fhead). */
+const FADES=[];
+function edgeFade(scroller, host){
+  if(!scroller || !host) return;
+  const max = host._fadeMax || 0;
+  const x = Math.round(scroller.scrollLeft);
+  if(max<=1){ delete host.dataset.fadeL; delete host.dataset.fadeR; return; }
+  if(x>1) host.dataset.fadeL=''; else delete host.dataset.fadeL;
+  if(x<max-1) host.dataset.fadeR=''; else delete host.dataset.fadeR;
+}
+/* scrollWidth - clientWidth overstates the reach wherever scrollbar-gutter
+   reserves space that is not scrollable: the compare pane reports 22px of room
+   against a real maximum of 7. Ask the browser what it will actually accept -
+   clamp and read back - rather than computing a number it disagrees with, or
+   the right-hand fade never goes out at the end of the scroll. */
+function measureFade(scroller, host){
+  if(!scroller || !host) return;
+  const cur=scroller.scrollLeft;
+  scroller.scrollLeft=1e6;
+  host._fadeMax=Math.round(scroller.scrollLeft);
+  scroller.scrollLeft=cur;
+  edgeFade(scroller, host);
+}
+function registerFade(scroller, host){
+  if(!scroller || !host) return;
+  FADES.push([scroller, host]);
+  scroller.addEventListener('scroll', ()=>edgeFade(scroller, host), {passive:true});
+}
+function refreshFades(){
+  /* the float's header is part of the same box as its body, so its fades have
+     to start below it or they run up the side of the title row */
+  const fh=mxFloat.querySelector('.float-h');
+  if(fh) mxFloat.style.setProperty('--fhead', fh.offsetHeight+'px');
+  FADES.forEach(([s,h])=>measureFade(s,h));
+}
+
 /* every dock re-fits whenever any of them changes, because availBody is a
    function of all of them */
-function fitDocks(){ fitPlan(); fitDrawer(); fitMatrix(); }
+function fitDocks(){ fitPlan(); fitDrawer(); fitMatrix(); refreshFades(); }
 
 /* The matrix in dock mode. fitFloat still owns it as a window above 720px. */
 function fitMatrix(){
@@ -5873,6 +5943,9 @@ function all(){
    rather than left for the first tap to sort out. Priority is the order in
    DOCK_KEYS reversed: the plan is the one you were most likely reading. */
 mxHome();
+registerFade(document.getElementById('paneCompare'), drawer.querySelector('.drawer-b'));
+registerFade(document.getElementById('panePlan'),    planDock.querySelector('.drawer-b'));
+registerFade(mxFloat.querySelector('.float-b'),      mxFloat);
 if(narrow() && openDocks().length>1) closeOtherDocks(S.planOpen? 'plan' : S.drawer? 'cmp' : 'mx');
 all();
 setTimeout(()=>{ map.invalidateSize({pan:false}); if(!fitted){ fitted=true; fitAll(); } }, 350);
