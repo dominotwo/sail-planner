@@ -834,8 +834,14 @@
   .pleg.hl { background:var(--ac-fill); box-shadow:inset 2px 0 0 var(--ac); }
   .pleg[draggable="true"] { cursor:grab; }
   .pleg.drag { opacity:.4; }
-  .pleg-nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .pleg-nm small { color:var(--muted-2); font-size:11px; }
+  /* Where you are going is the answer the row exists to give, and at 12.5px
+     regular it read as one more field among the numbers - and a smaller one
+     than the departure input beside it, which is a control. It carries the
+     heading face and a weight, like .pday-d does for the date. "from X" stays
+     small and muted: that is context, not the answer. */
+  .pleg-nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+             font-family:var(--font-heading); font-size:14px; font-weight:500; letter-spacing:-.01em; }
+  .pleg-nm small { color:var(--muted-2); font-size:11px; font-family:var(--font-body); font-weight:400; letter-spacing:0; }
   .pleg-arr, .pleg-h { font-variant-numeric:tabular-nums; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap; }
   .pleg-arr.night { color:var(--warn-t); }
   .ptime {
@@ -1075,6 +1081,11 @@
        business down there anyway - it acts on the leg, which line 1 names.
        Ordering rather than moving it in the markup, so the DOM stays in reading
        order for a screen reader and desktop is untouched. */
+    /* 14px, from the base rule, deliberately not larger. 15 was tried: at that
+       size "Santa Barbara Island from Emerald Bay" no longer fits beside the
+       give-a-day-back button, the button drops to its own line and the row goes
+       88px -> 100px (108 at 360px). The name is the heading face at 500 against
+       12px muted numbers, which is what makes it read - not another point. */
     .pleg-nm { flex:1 1 auto; min-width:0; white-space:normal; }
     /* 30px box, 44px reach. At a real 44x44 this button alone set line 1's
        height and the row went 76px -> 102px; the two other things on that line
