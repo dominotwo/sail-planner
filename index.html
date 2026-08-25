@@ -952,6 +952,32 @@
   .mx-key { display:none; flex-wrap:wrap; gap:var(--space-3) var(--space-6); margin-top:var(--space-4); font-size:11px; color:var(--muted); }
   .mx-key span.k { display:flex; align-items:center; gap:var(--space-2); }
 
+  /* ---------------- the location detail sheet (phone) ----------------
+     Sits above everything: the sidebar overlay is z-index 1300 and this is
+     opened from inside it. Scrim first so a tap outside the card closes it,
+     which is the gesture people try before they look for a control. */
+  .sheet { position:fixed; inset:0; z-index:1600; display:none; }
+  .sheet[data-on="true"] { display:block; }
+  .sheet-scrim { position:absolute; inset:0; background:color-mix(in srgb, #000 55%, transparent); }
+  .sheet-card {
+    position:absolute; left:0; right:0; bottom:0;
+    background:var(--color-bg); border-top:1px solid var(--line);
+    border-radius:var(--radius-md) var(--radius-md) 0 0;
+    padding:var(--space-6) var(--space-6) calc(var(--space-6) + var(--safe-b));
+    box-shadow:var(--shadow-lg); max-height:88dvh; overflow-y:auto; overscroll-behavior:contain;
+  }
+  .sheet-h { display:flex; align-items:center; gap:var(--space-3); }
+  .sheet-h .input { flex:1 1 auto; min-width:0; }
+  .sheet-coords { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-3); margin-top:var(--space-6); }
+  .sheet-coords label { display:flex; align-items:center; gap:var(--space-2); color:var(--muted-2); }
+  .sheet-acts { display:grid; gap:var(--space-3); margin-top:var(--space-6); }
+  .sheet-acts .btn { justify-content:flex-start; min-height:44px; font-size:13px; }
+  /* the fields are controls too, and this sheet exists because 16px boxes on a
+     phone are not tappable */
+  .sheet .input { min-height:44px; }
+  .sheet-acts .btn.danger { color:var(--danger); border-color:var(--ac-line); }
+  .sheet-used { color:var(--muted-2); margin-top:var(--space-4); }
+
   /* ---------------- responsive overrides ----------------
      These live at the end on purpose. A media query adds no specificity,
      so an override here only wins if it comes after the rule it is
@@ -1054,6 +1080,24 @@
     /* The docks are hidden rather than closed: their state survives, so closing
        the sidebar brings the plan back exactly as you left it. Opening a dock
        closes the sidebar (see setPlan / setCompare), so the two never fight. */
+
+    /* ---------------- M8: one location row, two tap targets ----------------
+       The row was a checkbox, "+ route", zoom-to and edit across 299px - four
+       adjacent 16px targets on a row you also want to tap, and the reason M3
+       had to leave this row alone: four finger-sized targets and their gaps
+       leave the name 83px, at which "Santa Barbara Island" wraps to three
+       lines. "+ route" stays inline as the one primary action; the rest is in
+       the detail sheet the row opens.
+
+       The checkbox goes with them, so the ticked state has to read some other
+       way. It already does: .loc.off dims both the badge and the name in the
+       base sheet, which is why nothing is added here for it. */
+    .loc { min-height:44px; cursor:pointer; }
+    /* the name is not the target - the row is - so it fills the row's height,
+       or a hit test finds an 18px strip inside a 55px row */
+    .loc-name { align-self:stretch; display:flex; align-items:center; }
+    .loc-chk { display:none; }
+    .loc-act .btn:not([data-act="route"]) { display:none; }
 
     /* ---------------- M5: the phone step on the type ramp ----------------
        Counted in the live DOM at 390px: 3 nodes at 9px, 4 at 9.5px, 34 at 10px
@@ -1418,16 +1462,10 @@
        usable area came back 20-32px for both. */
     .btn.mini { min-width:44px; min-height:44px; }
 
-    /* The location row is the one place this cannot be applied, and the reason
-       is arithmetic. The row is 289px and carries four adjacent controls -
-       checkbox, "+ route", zoom-to, edit - plus the name. Four 44px targets
-       and their gaps leave the name 83px, at which "Santa Barbara Island"
-       wraps to three lines and "Newport Harbor" to two: 44px targets bought by
-       truncating every label, which is the acceptance criterion this was
-       supposed to satisfy. The row needs M8 - one primary action inline, the
-       rest in a detail sheet - before it can carry finger-sized targets, so it
-       is left alone rather than made worse. */
-    .loc .btn.mini { min-width:0; min-height:0; }
+    /* The location row used to be excluded here: four adjacent 44px targets and
+       their gaps left the name 83px, at which "Santa Barbara Island" wrapped to
+       three lines. M8 took it down to one inline button and the row itself, so
+       both can be full size. */
     /* a text field is a control too, and iOS form fields are 44px anyway */
     .ptime { min-height:44px; }
 
@@ -1918,6 +1956,13 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- Phone only. A location row cannot carry four adjacent 16px buttons and a
+     name; everything but "+ route" lives in here. Rendered by renderLocSheet. -->
+<div class="sheet" id="locSheet" data-on="false" role="dialog" aria-modal="true" aria-label="Location">
+  <div class="sheet-scrim" data-sheet="close"></div>
+  <div class="sheet-card" id="locSheetCard"></div>
 </div>
 
 <script>
@@ -3044,31 +3089,123 @@ function sidebar(){
 }
 
 /* ---------------- interaction ---------------- */
-document.getElementById('locList').addEventListener('click', e=>{
-  const btn=e.target.closest('[data-act]'); if(!btn) return;
-  const id=e.target.closest('.loc').dataset.id, l=byId(id), act=btn.dataset.act;
-  if(act==='toggle'){ l.on=!l.on; if(!l.on){ S.route=S.route.filter(r=>r!==id); dedupeRoute(); } }
-  if(act==='fly'){ if(e.target.closest('.loc-edit')) return; map.flyTo([l.lat,l.lon], 11, {duration:.6}); }
-  if(act==='rename'){ editing = editing===id? null : id; }
-  if(act==='coords'){ coords = coords===id? null : id; }
+/* One implementation of what a location's actions DO, so the row and the phone
+   sheet cannot drift apart. Returns false if the visitor declined a
+   confirmation, so the caller knows nothing happened. */
+function locAct(id, act){
+  const l=byId(id); if(!l) return false;
+  if(act==='toggle'){
+    /* Unticking silently strips the place from the route being edited, which is
+       the kind of thing you only notice later. It asks when there is something
+       to lose - and it says what. */
+    if(l.on && S.route.includes(id)){
+      const r=activeRt();
+      if(!confirm('Hide "'+l.name+'"?\n\nIt is a stop in '+(r? '"'+r.name+'"' : 'this route')+' and will be taken out of it.')) return false;
+    }
+    l.on=!l.on;
+    if(!l.on){ S.route=S.route.filter(r=>r!==id); dedupeRoute(); }
+  }
+  if(act==='fly') map.flyTo([l.lat,l.lon], 11, {duration:.6});
+  if(act==='rename') editing = editing===id? null : id;
+  if(act==='coords') coords = coords===id? null : id;
   if(act==='route') addStop(id);
   if(act==='del'){
     /* removes the place from every saved route, not just the one being
        edited, and there is no undo - so it asks */
     const used=S.routes.filter(r=>(r.stops||[]).includes(id)).length;
-    if(!confirm('Delete "'+l.name+'"?'+(used? ' It is a stop in '+used+' route'+(used>1?'s':'')+'.':''))) return;
+    if(!confirm('Delete "'+l.name+'"?'+(used? ' It is a stop in '+used+' route'+(used>1?'s':'')+'.':''))) return false;
     S.locs=S.locs.filter(x=>x.id!==id);
     S.route=S.route.filter(r=>r!==id);
     S.routes.forEach(r=>{ r.stops=(r.stops||[]).filter(x=>x!==id); });   // not just the one being edited
     dedupeRoute();
   }
-  all();
+  return true;
+}
+document.getElementById('locList').addEventListener('click', e=>{
+  const row=e.target.closest('.loc'); if(!row) return;
+  const btn=e.target.closest('[data-act]');
+  const id=row.dataset.id, act=btn && btn.dataset.act;
+  /* Below 720px the row carries exactly two targets: "+ route", and the row
+     itself, which opens the detail sheet. Everything else the row used to hold
+     is in there - four adjacent 16px buttons on a row you also want to tap is
+     what M8 exists to undo. */
+  if(narrow() && act!=='route'){
+    if(e.target.closest('input')) return;      // typing in the name field
+    openLocSheet(id);
+    return;
+  }
+  if(!btn) return;
+  if(act==='fly' && e.target.closest('.loc-edit')) return;
+  locAct(id, act);
+  all();   // unconditional: a declined confirmation still has aria state to put back
 });
+/* ---------------- the location detail sheet (phone) ----------------
+   Transient, so it is a module-level id rather than a key in S: a sheet left
+   open when you close the tab is not a thing to restore. */
+let sheetLoc=null;
+const sheetEl = () => document.getElementById('locSheet');
+function openLocSheet(id){ sheetLoc=id; renderLocSheet(); }
+function closeLocSheet(){
+  if(!sheetLoc) return;
+  const card=document.getElementById('locSheetCard');
+  const nm=card.querySelector('#sheetName');
+  if(nm) commitName(nm);            // typing a name and tapping outside should keep it
+  sheetLoc=null; renderLocSheet();
+}
+function renderLocSheet(){
+  const el=sheetEl(), card=document.getElementById('locSheetCard');
+  const l = sheetLoc? byId(sheetLoc) : null;
+  el.dataset.on = l? 'true':'false';
+  if(!l){ card.innerHTML=''; return; }
+  const used=S.routes.filter(r=>(r.stops||[]).includes(l.id)).length;
+  card.innerHTML = `
+    <div class="sheet-h">
+      <span class="pin-no">${codeOf(l)}</span>
+      <input class="input loc-edit" id="sheetName" value="${l.name}" data-id="${l.id}" aria-label="Name this location">
+      <button class="iconx" data-sheet="close" title="Close" aria-label="Close">\u00d7</button>
+    </div>
+    <div class="sheet-coords">
+      <label>Lat<input class="input" data-cid="${l.id}" data-k="lat" value="${l.lat}" inputmode="decimal"></label>
+      <label>Lon<input class="input" data-cid="${l.id}" data-k="lon" value="${l.lon}" inputmode="decimal"></label>
+      <span class="coord-hint">or drag its pin on the chart</span>
+    </div>
+    <div class="sheet-acts">
+      <button class="btn btn-secondary" data-sact="fly">Zoom to on the chart</button>
+      <button class="btn btn-secondary" data-sact="toggle">${l.on? 'Hide from the chart':'Show on the chart'}</button>
+      ${l.custom? '<button class="btn btn-secondary danger" data-sact="del">Delete this location</button>' : ''}
+    </div>
+    ${used? `<div class="sheet-used">A stop in ${used} route${used>1?'s':''}.</div>` : ''}`;
+}
+sheetEl().addEventListener('click', e=>{
+  if(e.target.closest('[data-sheet="close"]') || e.target.classList.contains('sheet-scrim')){
+    closeLocSheet(); return;
+  }
+  const b=e.target.closest('[data-sact]'); if(!b || !sheetLoc) return;
+  const act=b.dataset.sact, id=sheetLoc;
+  /* fly and del leave; toggle stays, so you can see what it did */
+  const ok=locAct(id, act);
+  if(ok && (act==='fly' || act==='del')) sheetLoc=null;
+  renderLocSheet(); all();
+});
+sheetEl().addEventListener('change', e=>{
+  const inp=e.target.closest('[data-cid]'); if(!inp) return;
+  const l=byId(inp.dataset.cid), v=parseFloat(inp.value);
+  if(!l || !isFinite(v)) return renderLocSheet();
+  if(inp.dataset.k==='lat') l.lat=Math.max(32,Math.min(35,v)); else l.lon=Math.max(-121,Math.min(-116,v));
+  l.moved=true;
+  pathCache.clear(); all();
+});
+sheetEl().addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeLocSheet(); return; }
+  if(e.key==='Enter' && e.target.id==='sheetName'){ commitName(e.target); renderLocSheet(); }
+});
+
 function commitName(inp){
   const l=byId(inp.dataset.id); if(!l) return;
   const v=inp.value.trim();
   if(v) l.name=v;
   delete l.fresh; editing=null; all();
+  if(sheetLoc) renderLocSheet();     // all() redraws the list, not the sheet over it
 }
 document.getElementById('locList').addEventListener('keydown', e=>{
   const inp=e.target.closest('.loc-edit'); if(!inp) return;

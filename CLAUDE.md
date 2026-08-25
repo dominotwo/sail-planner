@@ -112,6 +112,22 @@ Closing a dock is `display:none`, which does not keep a scroll position.
 not in `requestAnimationFrame`, which runs before layout, so the pane has no
 scroll range yet and the assignment writes 0.
 
+## The location sheet (phone)
+Below 720px a location row carries exactly two targets: **"+ route"**, and the
+row itself, which opens `#locSheet`. Everything else the row holds on desktop —
+show/hide, rename, coordinates, zoom-to, delete — is in that sheet. The reason
+is arithmetic: four adjacent 44px targets and their gaps leave the name 83px,
+at which "Santa Barbara Island" wraps to three lines.
+
+`locAct(id, act)` is the single implementation of what those actions *do*, so
+the row and the sheet cannot drift; it returns `false` when a confirmation was
+declined. `sheetLoc` is a module-level id, not a key in `S` — a sheet left open
+when you close the tab is not a thing to restore. `commitName` re-renders the
+sheet after `all()`, because `all()` redraws the list *under* it.
+
+Hiding a location silently strips it from the route being edited, so on the
+phone it asks and names the route. Delete asks everywhere.
+
 ## When you change the plan panel
 The day bar is a fixed 24-hour scale: x = hour/24. The axis (`.pscale`), the
 day bars, the leg blocks and the tide curve all share that mapping — change one
@@ -180,11 +196,6 @@ before "discovering" any of them again.
   (which silently strips it from saved routes). `save()` runs on every `all()`,
   so nothing is recoverable. Hidden below 720px, but live on desktop. Location
   delete and route clear now ask; the rest do not.
-- **The locations list is the one row that is not finger-sized.** It is 289px
-  with four adjacent controls plus the name, and four 44px targets leave the
-  name 83px, at which "Santa Barbara Island" wraps to three lines. It needs the
-  detail-sheet restructure (M8) before it can carry the targets, so it is left
-  at its old sizes rather than made worse.
 - **Every network failure is silent.** Tides, ENC hazards and restricted areas,
   CDFW protected areas, ATON navaids, Nominatim and the elevation tiles all
   catch their errors and render nothing. There is no `tileerror` handler and no
