@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- viewport-fit=cover lets the page use the full screen on a notched phone,
+     which is what makes env(safe-area-inset-*) report anything but 0. The two
+     go together: cover without the insets puts the rail under the notch in
+     landscape. See the --safe-* tokens. Nothing sets user-scalable, so
+     pinch-zoom stays available. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sail Planner — Southern California Bight</title>
 <meta name="description" content="Plan sailing legs across the Southern California Bight: distance and sail time between harbours and Channel Islands anchorages, wind and tacking factored in, with route comparison.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161826'/%3E%3Cpath d='M16 6 L20.5 22 H11.5 Z' fill='%239184d9'/%3E%3Cpath d='M7 25 h18' stroke='%239184d9' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -26,6 +31,26 @@
 <script src="vendor/leaflet/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; }
+
+  :root {
+    /* What the hardware takes out of the viewport: the notch or Dynamic Island
+       in landscape, the home indicator at the bottom. Each falls back to 0px,
+       so every calc() below is a no-op on a device without insets - Android,
+       desktop, an older iPhone - rather than dead space. */
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+
+    /* The collapsed sidebar's width, which five other rules are pinned to: the
+       grid template at both widths, the peek panel's left, the filter probe's
+       left, and the matrix float's left and max-width. They were five separate
+       42/46/48/52/58px literals and had to move together; now they do.
+       --rail-edge is the rail plus whatever the notch is eating on that side,
+       which is the number everything to its right actually starts at. */
+    --rail: 42px;
+    --rail-edge: calc(var(--rail) + var(--safe-l));
+  }
   html, body { margin:0; height:100%; }
 
   /* ---------------------------------------------------------------
@@ -143,14 +168,18 @@
      chrome shows and hides. The vh line stays as the fallback. */
   .app { display:grid; grid-template-columns: 306px 1fr; grid-template-rows: minmax(0,1fr);
          height:100vh; height:100dvh; }
-  .app[data-collapsed="true"] { grid-template-columns: 42px 1fr; }
+  .app[data-collapsed="true"] { grid-template-columns: var(--rail-edge) 1fr; }
   .sidecol { display:flex; min-width:0; min-height:0; border-right:1px solid var(--line); }
-  .rail { display:none; flex-direction:column; align-items:center; gap:var(--space-3); padding:var(--space-4) 0; width:42px; }
+  /* padding-left rather than a narrower box: the icons stay centred in the
+     42px that is actually visible, and nothing sits under the notch. */
+  .rail { display:none; flex-direction:column; align-items:center; gap:var(--space-3);
+          padding:calc(var(--space-4) + var(--safe-t)) 0 calc(var(--space-4) + var(--safe-b)) var(--safe-l);
+          width:var(--rail-edge); }
   .app[data-collapsed="true"] .rail { display:flex; }
   .app[data-collapsed="true"] .side { display:none; }
   /* collapsed peek: hovering a rail icon floats just that section out */
   .app[data-collapsed="true"][data-peek] .side {
-    display:flex; position:fixed; left:46px; top:var(--peek-top,8px); bottom:auto;
+    display:flex; position:fixed; left:calc(var(--rail-edge) + 4px); top:var(--peek-top,8px); bottom:auto;
     width:300px; height:auto; max-height:min(76dvh, calc(100dvh - 16px)); z-index:1200;
     background:var(--color-bg); border:1px solid var(--line); border-radius:var(--radius-md);
     box-shadow:var(--shadow-md); overflow:hidden;
@@ -176,7 +205,10 @@
   .side-head { padding: var(--space-6) var(--space-6) var(--space-4); }
   .brand { font-family:var(--font-heading); font-weight:500; font-size:19px; letter-spacing:-0.02em; }
   .brand-sub { color:var(--muted); font-size:11.5px; margin-top:2px; }
-  .side-scroll { overflow-y:auto; flex:1; min-height:0; padding: 0 var(--space-6) var(--space-8); }
+  /* the sidebar runs to the bottom of the screen, so its last row is what the
+     home indicator covers when nothing else is open */
+  .side-scroll { overflow-y:auto; flex:1; min-height:0;
+                 padding: 0 var(--space-6) calc(var(--space-8) + var(--safe-b)); }
   .sec-label {
     font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
     color:var(--muted-2); margin: var(--space-6) 0 var(--space-3);
@@ -393,7 +425,7 @@
   .ctl { display:flex; align-items:center; gap:var(--space-3); flex:0 0 auto; }
   /* Floating, collapsible control panel over the chart */
   .ctrls {
-    position:absolute; right:var(--space-6); top:var(--space-6); z-index:600; width:224px;
+    position:absolute; right:calc(var(--space-6) + var(--safe-r)); top:calc(var(--space-6) + var(--safe-t)); z-index:600; width:224px;
     background:color-mix(in srgb, var(--color-bg) 90%, transparent); backdrop-filter:blur(8px);
     border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--shadow-md);
     overflow:hidden; color:var(--color-text); max-height:calc(100% - 2 * var(--space-6));
@@ -811,8 +843,11 @@
 
   /* ---------- matrix: a floating panel beside the sidebar ---------- */
   .float {
+    /* left is measured inside .stage, which already begins after the rail or
+       the sidebar, so this takes no --safe-l. The right edge of .stage IS the
+       right edge of the screen, so max-width does take --safe-r. */
     position:absolute; z-index:530; left:46px; top:var(--space-4);
-    max-width:calc(100% - 60px); max-height:calc(100% - 2*var(--space-4));
+    max-width:calc(100% - 60px - var(--safe-r)); max-height:calc(100% - 2*var(--space-4));
     display:none; flex-direction:column;
     background:color-mix(in srgb, var(--color-bg) 97%, transparent); border:1px solid var(--line); border-radius:var(--radius-md);
     box-shadow:var(--shadow-lg); backdrop-filter:blur(8px);
@@ -838,7 +873,7 @@
   .dtab.on { color:var(--color-text); font-family:var(--font-heading); font-size:13px; letter-spacing:-.01em; }
   .dtab.right { margin-left:auto; }
   .dmid { margin:0 auto; display:flex; align-items:center; gap:var(--space-3); }
-  .drawer-b { display:none; padding:0 var(--space-6) var(--space-6); max-height:34vh; }
+  .drawer-b { display:none; padding:0 var(--space-6) calc(var(--space-6) + var(--safe-b)); max-height:34vh; }
   .drawer[data-open="true"] .drawer-b { display:flex; align-items:stretch; }
   /* The fit measures this pane's width unconstrained, then caps its height —
      which raises a scrollbar and takes 15px back, so the squeeze was sizing
@@ -865,7 +900,10 @@
   /* last resort: names clip hard, but both numbers stay — they are the point */
   .pane.tighter .cmp td.wp, .pane.tighter .cmp th.rtsel,
   .pane.tighter .cmp th.rtsel .cmph { max-width:104px; }
-  .drawer-b { display:none; padding:0 var(--space-6) var(--space-6); max-height:34vh; overflow:hidden; }
+  /* A dock sits on the bottom edge of the app, so the end of its scroll is
+     under the home indicator without this. The padding is outside .pane, which
+     is the element that actually scrolls, so it holds the last row clear. */
+  .drawer-b { display:none; padding:0 var(--space-6) calc(var(--space-6) + var(--safe-b)); max-height:34vh; overflow:hidden; }
   .drawer[data-open="true"] .drawer-b { display:flex; align-items:stretch; }
   table.mx { font-size:11.5px; font-variant-numeric:tabular-nums; width:auto; }
   table.mx th, table.mx td { padding:3px 4px; text-align:right; white-space:nowrap; }
@@ -907,10 +945,11 @@
     .drawer-top { padding-left:var(--space-4); padding-right:var(--space-4); }
   }
   @media (max-width:720px){
-    .app, .app[data-collapsed="true"], .app[data-collapsed="false"] { grid-template-columns:42px 1fr; }
+    .app, .app[data-collapsed="true"], .app[data-collapsed="false"] { grid-template-columns:var(--rail-edge) 1fr; }
     .rail { display:flex; }
     .side {
-      position:fixed; left:42px; top:0; bottom:0; width:min(324px, calc(100vw - 52px));
+      position:fixed; left:var(--rail-edge); top:0; bottom:0;
+      width:min(324px, calc(100vw - var(--rail-edge) - var(--safe-r) - 10px));
       z-index:1300; box-shadow:var(--shadow-lg); border-right:1px solid var(--line);
     }
     .app[data-collapsed="true"] .side { display:none; }
@@ -919,9 +958,9 @@
        put the float beside Conditions at this width - they overlapped by 172x270
        - and fitFloat's "drop below" branch needs 230px of clearance it does not
        have here, so it is placed unconditionally instead. */
-    .float { left:48px; max-width:calc(100vw - 58px); top:60px; }
+    .float { left:48px; max-width:calc(100% - 58px - var(--safe-r)); top:60px; }
     .drawer-b { max-height:52vh; }
-    .ctrls { right:var(--space-3); top:var(--space-3); }
+    .ctrls { right:calc(var(--space-3) + var(--safe-r)); top:calc(var(--space-3) + var(--safe-t)); }
     /* above the sidebar overlay (1300), or the instruction sits behind it */
     .hint { z-index:1400; left:calc(50% + 21px); max-width:calc(100vw - 64px); }
     .rbtn { min-width:32px; min-height:32px; }
@@ -4656,7 +4695,12 @@ function fitFloat(){
   }
   const top=fR.top-mwR.top;
   const beside = top < (c.bottom-mwR.top)-4;
-  mxFloat.style.maxWidth = Math.max(240, (beside? c.left-10 : mwR.right-8) - fR.left)+'px';
+  /* Dropped below the Conditions panel, the float used to run to the chart's
+     right edge - which in landscape on a notched phone is under the notch.
+     Clamped to that panel's own right edge instead: it is the one other thing
+     pinned to this side and it already carries --safe-r, so the two line up
+     and only one rule needs to know about the inset. */
+  mxFloat.style.maxWidth = Math.max(240, (beside? c.left-10 : Math.min(mwR.right-8, c.right)) - fR.left)+'px';
   b.style.maxHeight = Math.max(110, mw.clientHeight - Math.max(0,top) - hh - 16)+'px';
 }
 function drawerBar(){
