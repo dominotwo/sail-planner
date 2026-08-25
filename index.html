@@ -1007,6 +1007,59 @@
        the sidebar brings the plan back exactly as you left it. Opening a dock
        closes the sidebar (see setPlan / setCompare), so the two never fight. */
 
+    /* ---------------- M5: the phone step on the type ramp ----------------
+       Counted in the live DOM at 390px: 3 nodes at 9px, 4 at 9.5px, 34 at 10px
+       and 61 at 10.5px. Dense is right for Nocturne at a chart table, but this
+       is read at arm's length in sun on a moving boat. Three rules:
+
+         1. nothing renders under 11px;
+         2. 11px belongs to uppercase micro-labels alone - anything that is a
+            sentence or a name moves off it;
+         3. the numbers a decision is made from are 14px.
+
+       Desktop is untouched: every rule here is inside the width query. */
+
+    /* 1 - the floor. Micro-labels, badges and axis ticks land on it. */
+    .ctl-l, .phead-l, .sec-label, .legend-t, .zhint, .coord-hint,
+    .loc-coords label, .pslack, .ptide-wait, .ptide-e,
+    .pin-no, .pin-seq, .cmpflag,
+    table.cmp th.lg, table.cmp th.sub, .cmp .tk, .cmp.nar .nrn,
+    .cmp.nar td.nr.big .nrn { font-size:11px; }
+    /* The attribution carries "Planning only - not for navigation", which is
+       the one line on this page that has to be readable. !important because
+       Leaflet sets its own. */
+    .leaflet-control-attribution { font-size:11px !important; }
+    /* .seg.tiny is the clock toggle in the dock header; .pstick i is the day
+       bar's hour row. The hour labels are positioned by left:%, so growing them
+       does not touch the x = hour/24 mapping the bar, the legs, the axis and
+       the tide curve all share. */
+    .seg.tiny .seg-opt { font-size:11px; }
+    .pstick i { font-size:11px; }
+    /* "compact" squeezes the tables before resorting to a scrollbar, and on a
+       phone the docks are always compact - so this is where the compare and
+       matrix numbers actually come from. The pane already scrolls sideways. */
+    .drawer.compact table.cmp, .drawer.compact table.mx,
+    .drawer.compact .cellv, table.mx thead th,
+    .mxh .vname { font-size:11px; }
+    /* the badges are sized boxes, so their glyph growing needs their box to */
+    .pin-no  { min-width:20px; height:20px; }
+    .pin-seq { min-width:17px; height:16px; top:-10px; }
+
+    /* 2 - off the floor: these are sentences and names, not labels. */
+    .rt-meta, .rnote, .pnote, .mx-note, .cmpsub, .cmpm,
+    .legend-for, .pin-lbl, .pday-sun, .pday-twi, .pday-moon, .pday-dark,
+    .route-empty, .brand-sub { font-size:12px; }
+    /* These two are 11.5, not 12, and the half point is load-bearing. Both sit
+       on a line with a fixed-width neighbour and both cross their line's budget
+       at 12: the route leg's meta wraps to a second line, and the plan leg's
+       "from X" pushes the give-a-day-back button onto a line of its own and the
+       row from 82px to 96px. Measured at 360 and 390. */
+    .rleg-meta, .pleg-nm small { font-size:11.5px; }
+
+    /* 3 - what you actually read to decide. Departure is already 16px because
+       iOS zooms below that, and the route total is already 20px. */
+    .rleg-val, .rleg-eta, .pleg-arr, .pleg-h { font-size:14px; }
+
     /* Nothing is hidden here any more.
        Two passes hid controls at this width on the premise that HTML5 drag never
        fires on touch. That is wrong: iOS Safari maps a long press onto the drag
@@ -1308,7 +1361,10 @@
     /* .rleg's last track held .rdel at 18px; a 44px button in it overflowed the
        row by exactly 26px. Change the child, change the template - the third
        time this file has taught that lesson. */
-    .rleg { grid-template-columns:9px 18px 1fr auto 44px; }
+    /* second track 20px, matching .pin-no's box - the badge grew with its glyph
+       on the type ramp. It was overflowing an 18px track into the gap, which
+       happened not to clip. Change the child, change the template. */
+    .rleg { grid-template-columns:9px 20px 1fr auto 44px; }
     /* .btn.mini gets a real box for the same reason: two of them side by side
        in the plan's leg row each had a 44px pseudo, they overlapped, and the
        usable area came back 20-32px for both. */
@@ -2741,6 +2797,8 @@ function matrix(L2){
   const body = a.map((r,i)=>`<tr><th data-loc="${r.id}"><span class="mxr"><span class="pin-no">${no(r)}</span>${r.name}</span></th>${a.map((_,j)=>cell(i,j)).join('')}</tr>`).join('');
   const key = `<div class="mx-key">${a.map(l=>`<span class="k" data-loc="${l.id}"><span class="pin-no">${no(l)}</span>${l.name}</span>`).join('')}</div>`;
   // the diagonal header band needs to clear the longest name: (chars × ~5.9px)/√2
+  // 5.9 was measured at 10.5px and over-estimates: at the phone's 11px the longest
+  // seed name renders 111px against 118 allocated, so the band still clears it.
   const longest = a.reduce((m,l)=>Math.max(m,l.name.length),0);
   document.getElementById('mxWrap').style.setProperty('--mxh-h', Math.round(longest*5.9/1.414)+26+'px');
   document.getElementById('mxWrap').innerHTML = a.length>1
