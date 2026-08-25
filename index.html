@@ -1069,7 +1069,28 @@
     /* the grip shares the first line with the name rather than sitting alone on
        one of its own: 100% basis pushed everything else off, including it */
     .pleg .grip { flex:0 0 auto; align-self:center; }
-    .pleg-nm { flex:1 0 calc(100% - 34px); white-space:normal; }
+    /* Line 1 is the name and the give-a-day-back button; line 2 is the times.
+       Once the steps and that button became 44px, line 2 wanted 334px in a
+       293px row and the button wrapped onto a third line of its own. It has no
+       business down there anyway - it acts on the leg, which line 1 names.
+       Ordering rather than moving it in the markup, so the DOM stays in reading
+       order for a screen reader and desktop is untouched. */
+    .pleg-nm { flex:1 1 auto; min-width:0; white-space:normal; }
+    /* 30px box, 44px reach. At a real 44x44 this button alone set line 1's
+       height and the row went 76px -> 102px; the two other things on that line
+       - the grip and the name - are 18px and neither is a tap target, so the
+       pseudo has nothing to steal from and the row stays 88px. The steps on
+       line 2 cannot do this: the time field beside them IS a target and wins
+       elementFromPoint inside the overlap, which is why they are real boxes. */
+    .pleg > .btn.mini {
+      order:0; margin-left:auto; position:relative;
+      min-width:0; min-height:0; width:30px; height:30px; font-size:15px;
+    }
+    .pleg > .btn.mini::after {
+      content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:var(--tap); height:var(--tap);
+    }
+    .pleg .pdep, .pleg .pleg-arr, .pleg .pleg-h { order:1; }
     .pleg .pdep { flex:0 0 auto; }
     .pleg .ptime { width:56px; min-width:0; text-align:center; }
     /* Without the column header the three times read as three unlabelled
@@ -1090,11 +1111,21 @@
        glance - and the exact times remain in the title. With them gone the date,
        the sun times, the moon and the +/x all fit one line. */
     .pday-moont { display:none; }
-    .pday-h { flex-wrap:wrap; row-gap:var(--space-1); }
-    .pday-sky { gap:var(--space-3); }
-    .drawer-top { flex-wrap:wrap; row-gap:var(--space-2); }
+    /* The day's +/x pair is 94px of the 293 now, which put the date, the sun
+       times and the actions 6px over one line. Both gaps tighten. */
+    .pday-h { flex-wrap:wrap; row-gap:var(--space-1); gap:var(--space-2); }
+    .pday-sky { gap:var(--space-2); }
+    /* The header's fixed items - title, clock toggle, csv/ics, close - came to
+       309px of the 342 available once they were finger-sized, so the close and
+       export buttons wrapped to a second line and the route name had nothing
+       left. The gap tightens and the title goes: this dock is opened by a
+       button that says "Plan by day" and .proute beside it names the route, so
+       the one thing the title was telling you is already on screen twice. */
+    .drawer-top { flex-wrap:wrap; row-gap:var(--space-2); gap:var(--space-2); }
     .drawer-top .dsub { display:none; }
-    .drawer-top .dttl { flex:0 0 auto; }
+    /* the PLAN dock's title only. Compare's header is just its title and the
+       minimize button - hide the title there and it is an unlabelled bar. */
+    #planTop .dttl { display:none; }
     .drawer-top .proute { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
     /* the stop and day rows stop advertising a grab they can't honour */
@@ -1215,7 +1246,7 @@
        track and sat underneath the time field - the field won elementFromPoint
        and half the button did nothing. The template moves with the button, the
        same coupling .rleg and .pleg carry a warning about. */
-    .pdep { grid-template-columns:44px 1fr 44px; gap:var(--space-2); }
+    .pdep { grid-template-columns:44px 1fr 44px; gap:2px; }
     .pstep { width:44px; height:44px; font-size:16px; }
     .pday-act { gap:var(--space-2); }
     .pday-act .btn { width:44px; height:44px; font-size:15px; }
