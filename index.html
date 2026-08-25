@@ -4182,13 +4182,16 @@ function applyHL(){
           lineCap:'round', lineJoin:'round', interactive:false}));
       });
   }
-  /* The place itself: its pin on the chart, and where it appears in the plan,
-     so hovering a location in the sidebar shows which days it falls on.
-     Deliberately NOT the sidebar's own rows (you are already pointing at
-     them), the matrix or the compare table - lighting all of those at once
-     was the noise this started as. Only this place, never the leg's origin. */
-  document.querySelectorAll(`.pin[data-loc="${hl}"], .pleg[data-loc="${hl}"]`)
-    .forEach(el=>el.classList.add('hl'));
+  /* One place, everywhere it is listed: its pin on the chart, its row in the
+     locations list, its stop in the route, its day in the plan. Whichever of
+     those you point at, the others answer - that is the whole use of it.
+     Two things stay out on purpose. The matrix and the compare table, because
+     one location lights a whole row and column there - seventeen cells - and
+     that was the noise this began as. And the far end of a leg: hovering a leg
+     marks where it arrives, never where it left. */
+  document.querySelectorAll(
+    `.pin[data-loc="${hl}"], .loc[data-loc="${hl}"], .rleg[data-loc="${hl}"], .pleg[data-loc="${hl}"]`
+  ).forEach(el=>el.classList.add('hl'));
 }
 function setHL(id, leg){
   const lk=leg? leg.join('|') : null, cur=hlLeg? hlLeg.join('|') : null;
