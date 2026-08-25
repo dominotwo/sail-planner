@@ -4169,27 +4169,26 @@ let hl=null, hlLeg=null;      // hlLeg: one named leg, when the hover knows both
 function applyHL(){
   document.querySelectorAll('.hl').forEach(el=>el.classList.remove('hl'));
   if(hlLayer) hlLayer.clearLayers();
-  if(hl){
-    /* A plan row names both ends, so it traces exactly its own leg; anything
-       else that knows only a place traces every leg touching it. */
-    const want = hlLeg
-      ? p=>(p.A===hlLeg[0]&&p.B===hlLeg[1])||(p.B===hlLeg[0]&&p.A===hlLeg[1])
-      : p=>p.A===hl||p.B===hl;
-    legPaths.filter(want).forEach(p=>{
-      hlLayer.addLayer(L.polyline(p.geo,{pane:'hlpane', color:p.col, weight:(p.w||3)+7, opacity:.22,
-        lineCap:'round', lineJoin:'round', interactive:false}));
-      hlLayer.addLayer(L.polyline(p.geo,{pane:'hlpane', color:p.col, weight:(p.w||3)+1.2, opacity:1,
-        lineCap:'round', lineJoin:'round', interactive:false}));
-    });
-  }
   if(!hl) return;
-  /* The chart only, and only the place under the pointer.
-     This used to mark every [data-loc] match, which lit the sidebar row, the
-     plan row and the matrix column all at once, and a second pass marked BOTH
-     ends of a leg so the origin lit up too. Hovering one thing should point at
-     one thing. The leg trace above still spans the whole leg, because that is
-     what a leg is. */
-  document.querySelectorAll(`.pin[data-loc="${hl}"]`).forEach(el=>el.classList.add('hl'));
+  /* A leg trace is for a LEG. Only a row that names both ends asks for one -
+     hovering a place used to trace every leg touching it, which lit up most of
+     the chart for a single anchorage. */
+  if(hlLeg){
+    legPaths.filter(p=>(p.A===hlLeg[0]&&p.B===hlLeg[1])||(p.B===hlLeg[0]&&p.A===hlLeg[1]))
+      .forEach(p=>{
+        hlLayer.addLayer(L.polyline(p.geo,{pane:'hlpane', color:p.col, weight:(p.w||3)+7, opacity:.22,
+          lineCap:'round', lineJoin:'round', interactive:false}));
+        hlLayer.addLayer(L.polyline(p.geo,{pane:'hlpane', color:p.col, weight:(p.w||3)+1.2, opacity:1,
+          lineCap:'round', lineJoin:'round', interactive:false}));
+      });
+  }
+  /* The place itself: its pin on the chart, and where it appears in the plan,
+     so hovering a location in the sidebar shows which days it falls on.
+     Deliberately NOT the sidebar's own rows (you are already pointing at
+     them), the matrix or the compare table - lighting all of those at once
+     was the noise this started as. Only this place, never the leg's origin. */
+  document.querySelectorAll(`.pin[data-loc="${hl}"], .pleg[data-loc="${hl}"]`)
+    .forEach(el=>el.classList.add('hl'));
 }
 function setHL(id, leg){
   const lk=leg? leg.join('|') : null, cur=hlLeg? hlLeg.join('|') : null;
