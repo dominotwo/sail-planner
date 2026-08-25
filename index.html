@@ -456,10 +456,14 @@
     padding:var(--space-3) var(--space-4);
   }
   .ctrls-h:hover { color:var(--ac-soft); }
-  .ctrls-t { color:var(--color-text); }
+
   .ctrls-sum { margin-left:auto; color:var(--muted-2); font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  /* Down means "this opens", up means "this closes" - the caret points at what
+     the tap will do. It used to point down when open and sideways when closed,
+     which said nothing. */
   .caret2 { transition:transform .18s; flex:none; }
-  .ctrls[data-open="false"] .caret2 { transform:rotate(-90deg); }
+  .ctrls[data-open="true"]  .caret2 { transform:rotate(180deg); }
+  .ctrls[data-open="false"] .caret2 { transform:none; }
   .ctrls[data-open="false"] .ctrls-b { display:none; }
   .ctrls-b { display:grid; gap:var(--space-6); padding:var(--space-2) var(--space-4) var(--space-6); }
   .ctrl-row { display:grid; gap:var(--space-3); }
@@ -685,7 +689,15 @@
     cursor:ns-resize; user-select:none;
   }
   .drawer[data-open="false"] { display:none; }
-  .dttl { font-family:var(--font-heading); font-size:16px; letter-spacing:-.015em; }
+  /* ---- panel and dock chrome ----
+     Conditions, the matrix, compare, plan and the detail sheet are the same
+     kind of surface and were titled at 11.5, 13 and 16px in three different
+     ways. One title, one size, one face. */
+  .dttl, .float-t, .ctrls-t {
+    font-family:var(--font-heading); font-size:13.5px; font-weight:500;
+    letter-spacing:-.01em; color:var(--color-text);
+  }
+  .dttl { font-size:13.5px; }
   .dsub { color:var(--muted-2); font-size:11px; }
   .iconx {
     margin-left:auto; width:22px; height:22px; display:grid; place-items:center; cursor:pointer; flex:none;
@@ -730,7 +742,15 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
   }
   .seg.tiny { margin-left:auto; flex:none; }
-  .pexp { display:flex; gap:2px; flex:none; }
+  .pexp { display:flex; gap:2px; flex:none; position:relative; }
+  .pexp-menu {
+    position:absolute; right:0; top:calc(100% + 6px); z-index:700;
+    display:flex; flex-direction:column; gap:2px; min-width:158px;
+    background:var(--color-surface); border:1px solid var(--color-divider);
+    border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:var(--space-2);
+  }
+  .pexp-menu[hidden] { display:none; }
+  .pexp-menu .btn { justify-content:flex-start; width:100%; }
   .seg.tiny .seg-opt { font-size:10px; padding:2px 6px; }
   .pcols {
     display:grid; grid-template-columns:12px 1fr 96px 58px 52px 20px; gap:var(--space-3);
@@ -880,7 +900,7 @@
     display:flex; align-items:center; gap:var(--space-4);
     padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--line); cursor:move; user-select:none;
   }
-  .float-t { font-family:var(--font-heading); font-size:13px; letter-spacing:-.01em; white-space:nowrap; }
+  .float-t { white-space:nowrap; }
   .float-sub { color:var(--muted-2); font-size:11px; white-space:nowrap; }
   .float-h .seg { margin-left:auto; flex:none; }
   .float-b { overflow:auto; padding:var(--space-3) var(--space-4) var(--space-4); }
@@ -1065,7 +1085,21 @@
        sideways beats clipping the numbers, so names get their width back */
     .pane.tight .cmp td.wp, .pane.tighter .cmp td.wp,
     .pane.tight .cmp th.rtsel, .pane.tighter .cmp th.rtsel { max-width:118px; }
+    /* The cap and the clip move off .cmph and onto the route name. .cmph holds
+       the name AND the close button, and at 104px with overflow:hidden the
+       44px button overflowed it by 9px - so its right edge was cut off. The
+       name is the part that is supposed to ellipsise; the button is the part
+       that has to stay whole. */
+    .pane.tight .cmp th.rtsel .cmph,
+    .pane.tighter .cmp th.rtsel .cmph { max-width:none; overflow:visible; }
+    .pane.tight .cmp th.rtsel .cmpn { max-width:104px; }
+    .pane.tighter .cmp th.rtsel .cmpn { max-width:76px; }
     .pane { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    /* The plan has nothing to scroll sideways to - it scrolled 7px because the
+       day's x button reaches 44px out of a 30px box and that overhang sits at
+       the right edge. The room it needs is given rather than clipped, so the
+       button keeps its full reach and the pane stops moving. */
+    #panePlan .pane-body { padding-right:7px; }
 
     /* One surface at a time. Measured at 390x844 with everything open: the
        sidebar alone covers 83% of the screen, 89% of the viewport sits under some
@@ -1092,7 +1126,10 @@
        The checkbox goes with them, so the ticked state has to read some other
        way. It already does: .loc.off dims both the badge and the name in the
        base sheet, which is why nothing is added here for it. */
-    .loc { min-height:44px; cursor:pointer; }
+    /* 44px exactly, not 55. The row has to be a 44px target, so that is the
+       floor - but the "+ route" button inside it is already 44 and the row's
+       own 5.6px of padding was stacking on top of it. 6 rows: 330px -> 264px. */
+    .loc { min-height:44px; padding-top:0; padding-bottom:0; cursor:pointer; }
     /* the name is not the target - the row is - so it fills the row's height,
        or a hit test finds an 18px strip inside a 55px row */
     .loc-name { align-self:stretch; display:flex; align-items:center; }
@@ -1125,7 +1162,10 @@
        bar's hour row. The hour labels are positioned by left:%, so growing them
        does not touch the x = hour/24 mapping the bar, the legs, the axis and
        the tide curve all share. */
-    .seg.tiny .seg-opt { font-size:11px; }
+    /* one tab size across the dock headers: the plan's clock toggle is .seg.tiny
+       and the matrix's Distance/Time is not, and they sat at 11 and 11.5px in
+       headers that are otherwise identical */
+    .seg.tiny .seg-opt { font-size:11.5px; padding:4px 10px; }
     .pstick i { font-size:11px; }
     /* "compact" squeezes the tables before resorting to a scrollbar, and on a
        phone the docks are always compact - so this is where the compare and
@@ -1925,7 +1965,7 @@
       <div class="drawer-top" id="drawerTop" title="Drag to resize — double-click to fit the content">
         <span class="dttl">Compare routes</span>
         <span class="dsub" id="cmpSub"></span>
-        <button class="iconx" data-hide="1" title="Minimize" aria-label="Minimize">–</button>
+        <button class="iconx" data-hide="1" title="Close" aria-label="Close">×</button>
       </div>
       <div class="drawer-b">
         <section class="pane" id="paneCompare" data-pane="compare">
@@ -1944,10 +1984,13 @@
           <label class="seg-opt"><input type="radio" name="clock" value="12">12 h</label>
         </div>
         <span class="pexp">
-          <button class="btn btn-ghost mini" id="planCsv" title="Download the plan as a CSV table">csv</button>
-          <button class="btn btn-ghost mini" id="planIcs" title="Download the plan as calendar events (.ics)">ics</button>
+          <button class="btn btn-ghost mini" id="planExp" aria-expanded="false" aria-haspopup="true" title="Download this plan">Export</button>
+          <span class="pexp-menu" id="planExpMenu" hidden>
+            <button class="btn btn-ghost mini" id="planCsv" title="Download the plan as a CSV table">CSV table</button>
+            <button class="btn btn-ghost mini" id="planIcs" title="Download the plan as calendar events (.ics)">Calendar (.ics)</button>
+          </span>
         </span>
-        <button class="iconx" data-hide="1" title="Minimize" aria-label="Minimize">–</button>
+        <button class="iconx" data-hide="1" title="Close" aria-label="Close">×</button>
       </div>
       <div class="drawer-b">
         <section class="pane" id="panePlan" data-pane="plan">
@@ -3185,6 +3228,12 @@ sheetEl().addEventListener('click', e=>{
   /* fly and del leave; toggle stays, so you can see what it did */
   const ok=locAct(id, act);
   if(ok && (act==='fly' || act==='del')) sheetLoc=null;
+  /* Zooming the chart to a place and leaving the sidebar over the chart shows
+     you nothing. The sheet closes above; the sidebar goes with it. */
+  if(ok && act==='fly' && narrow() && !S.collapsed){
+    S.collapsed=true; appEl.dataset.collapsed='true';
+    setTimeout(()=>map.invalidateSize({pan:false}),220);
+  }
   renderLocSheet(); all();
 });
 sheetEl().addEventListener('change', e=>{
@@ -4542,6 +4591,15 @@ document.getElementById('collapseBtn').addEventListener('click', ()=>{
 document.getElementById('rail').addEventListener('click', e=>{
   const b=e.target.closest('[data-rail]');
   const target=b? b.dataset.rail : 'open';        // anywhere on the rail reopens the sidebar
+  /* On a phone the rail stays visible beside the open sidebar, so it is the
+     strip you press to get the chart back - it toggles rather than only
+     opening. Pressing a section icon still jumps to that section instead of
+     closing, or you could never navigate with the sidebar already up. */
+  if(narrow() && !S.collapsed && target==='open'){
+    S.collapsed=true; appEl.dataset.collapsed='true'; setPeek(null); save();
+    setTimeout(()=>map.invalidateSize({pan:false}),220);
+    return;
+  }
   S.collapsed=false; appEl.dataset.collapsed='false'; setPeek(null); save();
   setTimeout(()=>{
     map.invalidateSize({pan:false});
@@ -4665,6 +4723,23 @@ function planExport(){
   const S2=planSchedule(r.id); if(!S2 || !S2.days.length) return null;
   return {r, S2};
 }
+/* csv and ics were two buttons in a header that had no room for them. One
+   Export button and a menu under it; the menu closes on a choice, on Escape,
+   or on a press anywhere else. */
+const expBtn=document.getElementById('planExp'), expMenu=document.getElementById('planExpMenu');
+function setExport(on){
+  expMenu.hidden=!on;
+  expBtn.setAttribute('aria-expanded', !!on);
+}
+expBtn.addEventListener('click', e=>{ e.stopPropagation(); setExport(expMenu.hidden); });
+expMenu.addEventListener('click', ()=>setExport(false));
+document.addEventListener('pointerdown', e=>{
+  if(expMenu.hidden) return;
+  const t=e.target;                          // may be the document itself
+  if(!(t && t.closest && t.closest('.pexp'))) setExport(false);
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') setExport(false); });
+
 document.getElementById('planCsv').addEventListener('click', ()=>{
   const x=planExport(); if(!x) return;
   const q=v=>{ v=String(v==null?'':v); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; };
@@ -5310,10 +5385,12 @@ drawerTop.addEventListener('click', e=>{
   if(e.target.closest('[data-hide]')) setCompare(false);
 });
 /* Clicking the chart dismisses the matrix float, which sits over the water — the
-   comparison drawer is docked below it and stays put until it is closed. */
+   comparison drawer is docked below it and stays put until it is closed.
+   Below 720px the matrix IS a dock, sitting below the chart rather than on it,
+   so it stays put too: nothing is in the way of the tap. */
 document.querySelector('.map-wrap').addEventListener('pointerdown', e=>{
   if(e.target.closest('.float') || e.target.closest('.ctrls')) return;
-  if(S.mxOpen) setMatrix(false);
+  if(S.mxOpen && !mxIsDock()) setMatrix(false);
   /* on a phone the sidebar floats over the chart — touching the water dismisses it */
   if(window.innerWidth<=720 && !S.collapsed){ S.collapsed=true; appEl.dataset.collapsed='true'; save(); setTimeout(()=>map.invalidateSize({pan:false}),60); }
 });
@@ -5322,9 +5399,13 @@ window.addEventListener('keydown', e=>{
   if(S.mxOpen) setMatrix(false);
   else if(S.drawer) setCompare(false);
 });
-/* drag the float by its header */
+/* Drag the float by its header — above 720px only. As a dock the same header is
+   the drag-to-RESIZE handle (see mxTop's pointerdown), and both were firing:
+   this one captured the pointer and called fitFloat, which overwrote the height
+   the other had just set. That is why resizing did nothing. */
 let mxMoved=false;
 mxFloat.querySelector('.float-h').addEventListener('pointerdown', e=>{
+  if(mxIsDock()) return;
   if(e.target.closest('button') || e.target.closest('.seg')) return;
   const h=e.currentTarget, r=mxFloat.getBoundingClientRect();
   const st=document.querySelector('.stage').getBoundingClientRect();
