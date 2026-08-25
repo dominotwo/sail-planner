@@ -251,6 +251,22 @@
     box-shadow:var(--shadow-md); overflow:hidden;
   }
   .app[data-collapsed="true"][data-peek] .side-head { display:none; }
+  .peek-x { display:none; }
+  .app[data-collapsed="true"][data-peek] .peek-x {
+    display:grid; place-items:center; position:absolute; z-index:2;
+    top:var(--space-3); right:var(--space-3); width:26px; height:26px; padding:0;
+    background:var(--color-bg); border:1px solid var(--line); border-radius:var(--radius-sm);
+    color:var(--muted-2); cursor:pointer;
+  }
+  .app[data-collapsed="true"][data-peek] .peek-x:hover { color:var(--ac); border-color:var(--ac-line); background:var(--ac-fill); }
+  /* 26px box, 44px reach. It sits in the panel's corner with nothing beside it,
+     so the pseudo has nothing to take a tap from. */
+  .app[data-collapsed="true"][data-peek] .peek-x::after {
+    content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:var(--tap, 44px); height:var(--tap, 44px);
+  }
+  /* the section label would run under it */
+  .app[data-collapsed="true"][data-peek] .sec-label { padding-right:30px; }
   .app[data-collapsed="true"][data-peek] .side-scroll { padding:var(--space-4) var(--space-6) var(--space-6); }
   .app[data-collapsed="true"][data-peek="legend"] .legend { margin-top:0; padding-top:0; border-top:0; }
   .app[data-collapsed="true"][data-peek] .sec-label { margin-top:var(--space-2); }
@@ -1944,6 +1960,11 @@
     </button>
   </nav>
   <aside class="side" id="side">
+    <!-- Only ever visible on a peeked section: that panel hides .side-head, so
+         without this its only way out is a tap somewhere else. -->
+    <button class="peek-x" id="peekX" title="Close" aria-label="Close">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
     <header class="side-head">
       <div class="brand-wrap">
         <!-- the mark was only ever in the favicon; on the page the name had
@@ -5011,6 +5032,13 @@ document.getElementById('collapseBtn').addEventListener('click', ()=>{
 document.getElementById('rail').addEventListener('click', e=>{
   const b=e.target.closest('[data-rail]');
   const target=b? b.dataset.rail : 'open';        // anywhere on the rail reopens the sidebar
+  /* Touch peeks on a tap, because it cannot hover. The same tap on the same
+     icon closes it again, which is the first thing anyone tries — and there is
+     a close button on the panel, Escape, and a press anywhere outside. */
+  if(!window.matchMedia('(hover:hover)').matches && S.collapsed && target!=='open'){
+    setPeek(appEl.dataset.peek===target? null : target, b);
+    return;
+  }
   /* On a phone the rail stays visible beside the open sidebar, so it is the
      strip you press to get the chart back - it toggles rather than only
      opening. Pressing a section icon still jumps to that section instead of
@@ -5041,16 +5069,16 @@ function setPeek(v, btn){
   document.querySelectorAll('.rbtn').forEach(b=>b.setAttribute('aria-current', b.dataset.rail===v));
 }
 document.getElementById('rail').addEventListener('mouseover', e=>{
-  /* Peeking is a hover gesture and it closes on mouseleave. A tap fires the
-     synthetic mouseover and never the leave, so on touch the panel opened and
-     stayed open with nothing to dismiss it. A finger gets the full sidebar
-     from the click handler instead, which is what it wanted anyway. */
+  /* On a pointer device this is the whole gesture: hover to peek, leave to
+     close. A finger has no leave, so touch drives it from the click handler
+     instead - see setPeekFromTap. */
   if(!window.matchMedia('(hover:hover)').matches) return;
   const b=e.target.closest('[data-rail]');
   if(!b || !S.collapsed) return;
   if(b.dataset.rail==='open') setPeek(null); else setPeek(b.dataset.rail, b);
 });
 /* and two ways out that do not depend on the pointer ever leaving */
+document.getElementById('peekX').addEventListener('click', e=>{ e.stopPropagation(); setPeek(null); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && appEl.dataset.peek) setPeek(null); });
 document.addEventListener('pointerdown', e=>{
   if(appEl.dataset.peek && !e.target.closest('.sidecol')) setPeek(null);
