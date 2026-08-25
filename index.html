@@ -299,7 +299,11 @@
   }
   table.cmp th.sub {
     font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted-2);
-    padding-top:0; padding-bottom:var(--space-2); font-weight:400;
+    /* even, not 0/5.6. The zero top was there to tuck this under the route name
+       above it, and the effect was that the text sat 2px from the top of its own
+       22px row and 7px from the bottom - visibly high against every other row in
+       the table, which centres. */
+    padding-top:var(--space-1); padding-bottom:var(--space-1); font-weight:400;
   }
   table.cmp th.sub.num, table.cmp td.numc { text-align:center; }
   .cmp .grp { border-left:1px solid var(--line); }
