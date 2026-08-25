@@ -168,7 +168,12 @@
 
   /* Every scroller stops at its own end instead of chaining into whatever is
      behind it. Not gated on touch: scroll chaining is wrong with a wheel too. */
-  .side-scroll, .pane, .drawer-b, .float-b { overscroll-behavior:contain; }
+  .side-scroll, .pane, .drawer-b, .float-b, .ctrls-b { overscroll-behavior:contain; }
+  /* .ctrls clips rather than scrolls, so anything past its max-height was
+     simply unreachable. That was latent - a short window would have done it -
+     and finger-sized controls make the panel 1039px tall at 390x844, which is
+     229px past the cap. It scrolls now. */
+  .ctrls-b { overflow-y:auto; overflow-x:hidden; min-height:0; }
   a { color: var(--ac-soft); text-decoration:none; }
   a:hover { color: var(--ac); }
   :focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
@@ -1039,7 +1044,10 @@
        matches them - which is what put the meta in the 9px grip column. */
     .rleg .rleg-nm     { grid-area:1 / 3; }
     .rleg > .rleg-val  { grid-area:1 / 4; }
-    .rleg > .rdel      { grid-area:1 / 5; }
+    /* spans both rows rather than sitting in the first. As a 44px-tall button
+       in row 1 it pushed every leg from 51px to 76px - undoing the line this
+       file had just reclaimed. Spanning, its target is the row's own height. */
+    .rleg > .rdel      { grid-column:5; grid-row:1 / span 2; align-self:center; }
     /* hung from the pin column, not the name: at 3 the longest leg meta ("broad
        reach" plus tacking) was 14px over and wrapped to a second line again. */
     .rleg .rleg-meta   { grid-area:2 / 2 / auto / -1; }
@@ -1097,34 +1105,17 @@
   @media (hover:none){
     .loc-act { opacity:1; position:static; transform:none; padding-left:0; background:none; }
     .loc { gap:var(--space-2); }
-    /* Controls that stay on touch are 12-16px tall, well under a finger. Grow the
-       hit area with a pseudo-element rather than the box, so nothing moves and no
-       layout is re-measured. Horizontal growth is kept to less than half the
-       neighbouring gap so adjacent buttons cannot steal each other's taps. */
+    /* The stacked arrows are 16x10 with a 1px gap. Their hit areas are grown
+       only inside that gap so the midpoint between them still resolves to the
+       nearer one - it used to resolve to DOWN, so pressing "up" could move a
+       stop the wrong way. They are hidden below 720px, so this is the tablet. */
+    .rmove { gap:var(--space-2); }
+    .rmove .btn { min-width:26px; min-height:24px; font-size:10px; padding:0; }
+    .rmove .btn::after { content:""; position:absolute; inset:-2px 0; }
+    .rmove .btn { position:relative; }
     /* These are opacity:0 until their row is hovered. With no hover they are
        present, sized and clickable but invisible - worse than absent. */
     .rt-act, .rdel, .pday-act, .rmove { opacity:1; }
-    /* The stacked arrows were 16x10 with a 1px gap and an 8px glyph, and their
-       expanded hit areas overlapped - the midpoint between them resolved to the
-       DOWN arrow, so pressing "up" could move a stop the wrong way. Real size
-       here, with the expansion kept inside the gap so they stay independent. */
-    /* the grip is the drag handle and now the primary way to reorder here, so it
-       gets a finger-sized target of its own */
-    .rleg .grip, .pleg .grip { padding:6px 4px; margin:-6px -4px; }
-    /* Measured in the plan panel: the +/-15min steps were 16x18, the Tides
-       checkbox 15x15 and the day insert/remove 20x16. Grown with a pseudo
-       element so nothing moves and no layout is re-measured. */
-    .pstep, .pday-act .btn, .phead .chk input { position:relative; }
-    .pstep::after,
-    .pday-act .btn::after { content:""; position:absolute; inset:-5px -3px; }
-    .phead .chk input::after { content:""; position:absolute; inset:-6px; }
-    .rmove { gap:var(--space-2); }
-    .rmove .btn { min-width:26px; min-height:24px; font-size:10px; padding:0; }
-    .rmove .btn::after { inset:-2px 0; }
-    .btn.mini, .loc-chk, .rt-eye { position:relative; }
-    .btn.mini::after  { content:""; position:absolute; inset:-5px -2px; }
-    .loc-chk::after   { content:""; position:absolute; inset:-5px; }   /* 16px box -> 26px target */
-    .rt-eye::after    { content:""; position:absolute; inset:-6px -4px; }
 
     /* ---- pressed states, since there is no hover to give feedback ----
        Every colour here is a palette token, so the flash is calibrated in all
@@ -1165,6 +1156,115 @@
     .phead .hm          { width:76px; }
     .pleg .ptime        { width:76px; }
     .loc-edit, .rt-edit { padding:2px 6px; }
+  }
+
+  /* ---------------- phone: 44px on everything you press ----------------
+     Scoped to touch AND the phone width, not to touch alone. The tablet keeps
+     the dense desktop grids: .pcols, .pleg and .pdep hold their controls in
+     12/16/20px tracks, and a 44px minimum pushed them straight out of those
+     tracks - a control overflowing its own column is worse than a 30px one.
+     Every number below was measured at 390x844, which is what the brief is
+     about. */
+  @media (hover:none) and (max-width:720px){
+    /* ---- M3: 44px on everything you press ----
+       The previous pass grew hit areas with hand-computed negative insets and
+       topped out near 26px, while the visible mark stayed 12-16px. Measured by
+       hit-test at 390px, 52 controls in the sidebar alone resolved to less than
+       44x44. Two techniques here:
+
+         - a centred ::after, where the visible box must stay small and the row
+           must not move: checkboxes, map pins, icon buttons in dense rows;
+         - a real box, where there is room for one: the rail, the segmented
+           options, the panel headers, the dock close.
+
+       The pseudo is sized max(100%, var(--tap)) and centred on its own box
+       rather than inset by a computed amount. That is correct whatever size the
+       element happens to be, so it does not need revisiting when a font or a
+       padding changes - which is how the old insets drifted out of date. */
+    :root {
+      --tap: 44px;    /* Apple's minimum, and what the audit script checks */
+      --rail: 48px;   /* a 44px rail button with 2px either side of it */
+    }
+
+    .rt-eye, .pin-dot { position:relative; }
+    .rt-eye::after, .pin-dot::after {
+      content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:max(100%, var(--tap)); height:max(100%, var(--tap));
+    }
+
+    /* Real boxes, where the layout has room. The glyph grows with the box so a
+       44px target does not read as a 12px mark floating in space. */
+    .rbtn { width:44px; height:44px; }
+    .ctrls-h { min-height:44px; }
+    .seg-opt { min-height:44px; display:flex; align-items:center; }
+    .ctrls .seg-opt { padding:4px 6px; }
+    .chk { min-height:44px; }
+    /* 20, not 22: at 22 the box plus its gap plus the label was 96px in a 94px
+       row and the panel wanted a horizontal scrollbar for 2px. The label is the
+       44px target here - the input is just the mark inside it. */
+    .chk input { width:20px; height:20px; }
+    .switch { min-height:44px; }
+    .btn-block { min-height:44px; }
+    .radd select { min-height:44px; }
+    /* Real boxes rather than a pseudo for these four. Their ::after did reach
+       44px, but a neighbour painted later won elementFromPoint inside the
+       overlap and the usable area came back 26-40px - which is criterion 3
+       working correctly and criterion 1 failing anyway. The only way to have
+       both is to give them the room. */
+    /* .pdep is a grid at 16px 1fr 16px, so a 44px step overflowed its own
+       track and sat underneath the time field - the field won elementFromPoint
+       and half the button did nothing. The template moves with the button, the
+       same coupling .rleg and .pleg carry a warning about. */
+    .pdep { grid-template-columns:44px 1fr 44px; gap:var(--space-2); }
+    .pstep { width:44px; height:44px; font-size:16px; }
+    .pday-act { gap:var(--space-2); }
+    .pday-act .btn { width:44px; height:44px; font-size:15px; }
+    .iconx { width:44px; height:44px; font-size:16px; }
+    .cmpx { width:44px; height:44px; font-size:15px; }
+    .seg-opt { min-width:44px; justify-content:center; }
+    /* .rleg's last track held .rdel at 18px; a 44px button in it overflowed the
+       row by exactly 26px. Change the child, change the template - the third
+       time this file has taught that lesson. */
+    .rleg { grid-template-columns:9px 18px 1fr auto 44px; }
+    /* .btn.mini gets a real box for the same reason: two of them side by side
+       in the plan's leg row each had a 44px pseudo, they overlapped, and the
+       usable area came back 20-32px for both. */
+    .btn.mini { min-width:44px; min-height:44px; }
+
+    /* The location row is the one place this cannot be applied, and the reason
+       is arithmetic. The row is 289px and carries four adjacent controls -
+       checkbox, "+ route", zoom-to, edit - plus the name. Four 44px targets
+       and their gaps leave the name 83px, at which "Santa Barbara Island"
+       wraps to three lines and "Newport Harbor" to two: 44px targets bought by
+       truncating every label, which is the acceptance criterion this was
+       supposed to satisfy. The row needs M8 - one primary action inline, the
+       rest in a detail sheet - before it can carry finger-sized targets, so it
+       is left alone rather than made worse. */
+    .loc .btn.mini { min-width:0; min-height:0; }
+    /* a text field is a control too, and iOS form fields are 44px anyway */
+    .ptime { min-height:44px; }
+
+    /* A range input is a 2px line: its thumb is the target and it was 13px of
+       vertical reach. The track is drawn by the thumb's sibling pseudo, so the
+       box can grow without the line moving. */
+    input[type=range] { height:44px; background:transparent; }
+    input[type=range]::-webkit-slider-runnable-track {
+      height:2px; background:var(--line); border-radius:2px;
+    }
+    input[type=range]::-webkit-slider-thumb { width:20px; height:20px; margin-top:-9px; }
+
+    /* Leaflet's own control ships at 30px. */
+    .leaflet-touch .leaflet-bar a, .leaflet-control-zoom a {
+      width:44px; height:44px; line-height:44px; font-size:20px;
+    }
+
+    /* Stacked, these two overlapped: the midpoint between them resolved to the
+       DOWN arrow, so pressing "up" could move a stop the wrong way. Side by
+       side each gets its own 44px with the gap between them, which is the only
+       arrangement where both can be full size and stay independent. They are
+       hidden below 720px anyway - this is the tablet case. */
+    .rmove { flex-direction:row; gap:var(--space-2); }
+    .rmove .btn { min-width:44px; min-height:44px; font-size:11px; padding:0; }
   }
 
   /* ---------------- WebKit: filter the tiles, not the pane ----------------
