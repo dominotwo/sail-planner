@@ -1074,6 +1074,34 @@
     .btn.mini::after  { content:""; position:absolute; inset:-5px -2px; }
     .loc-chk::after   { content:""; position:absolute; inset:-5px; }   /* 16px box -> 26px target */
     .rt-eye::after    { content:""; position:absolute; inset:-6px -4px; }
+
+    /* ---- no text field under 16px ----
+       Safari zooms the page when a field smaller than 16px takes focus, and it
+       does not zoom back. Editing a departure time is the plan panel's main
+       action, so the first useful tap pushed the fixed rail and the docks off
+       screen and left the chart the wrong size. There is no opt-out short of
+       user-scalable=no, which would also kill pinch — so the fields grow.
+
+       This sits under the same (hover:none) as the hit areas above rather than
+       under its own (pointer:coarse). One test for "this is a phone", not two
+       that can drift apart, and this is the one already proven on the device.
+
+       Every box widens with its type: 16px tabular digits are ~4.5px wider
+       each than 11.5px ones, and a clipped time is worse than a zoomed page.
+       select is in the list because iOS zooms for those too. */
+    .input, .ptime, .radd select, .loc-edit, .rt-edit { font-size:16px; }
+    /* font-size repeated here, not inherited from the line above: the base
+       rule is `.loc-coords .input` at two classes and a media query adds no
+       specificity, so a one-class `.input` loses to it and the coordinates
+       stayed at 11.5px while their boxes grew.
+       104px because a dropped pin is stored at toFixed(4), so the widest a
+       coordinate gets is "-117.9023" — nine tabular glyphs, 86px at this size,
+       plus padding and border. */
+    .loc-coords .input  { font-size:16px; width:104px; padding:2px 5px; }
+    .phead .ptime       { width:158px; }     /* a full date plus its picker glyph */
+    .phead .hm          { width:76px; }
+    .pleg .ptime        { width:76px; }
+    .loc-edit, .rt-edit { padding:2px 6px; }
   }
 
   /* ---------------- WebKit: filter the tiles, not the pane ----------------
