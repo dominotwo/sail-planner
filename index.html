@@ -1268,6 +1268,18 @@
        the sidebar brings the plan back exactly as you left it. Opening a dock
        closes the sidebar (see setPlan / setCompare), so the two never fight. */
 
+    /* The route row is 20px of swatch, the name, the stats and up to three
+       44px buttons across 289px — which left the name a 12px track and
+       "Island loop" ellipsised to "I…". The stats go to a second line and the
+       name gets 116px. Costs ~15px a route and keeps both.
+       Hiding a grid child or moving one means editing the template: see the
+       note by .rleg. */
+    .rt { grid-template-columns:20px 1fr auto; row-gap:2px; }
+    .rt > .rt-eye  { grid-area:1 / 1; }
+    .rt > .rt-nm   { grid-area:1 / 2; }
+    .rt > .rt-act  { grid-area:1 / 3; }
+    .rt > .rt-meta { grid-area:2 / 2 / auto / -1; }
+
     /* ---------------- M8: one location row, two tap targets ----------------
        The row was a checkbox, "+ route", zoom-to and edit across 299px - four
        adjacent 16px targets on a row you also want to tap, and the reason M3
@@ -2547,6 +2559,29 @@ function hueFor(id){
   const j=S.routes.findIndex(r=>r.id===id);
   return Math.round((190+137.5*(j+1))%360);
 }
+/* Copy a route to try a variant of it — reverse a leg, add a night at Little
+   Harbor — without losing the one you have. The plan comes with it: the days
+   and the departure times are the work, and a duplicate that dropped them
+   would send you back to the start of exactly the thing you were varying. */
+function duplicateRoute(id){
+  const src=rt(id); if(!src) return;
+  syncRoute();                                   // the live route may be ahead of src.stops
+  const used=S.routes.map(r=>r.hue);
+  const hue=HUES.find(h=>!used.includes(h)) ?? HUES[S.routes.length%HUES.length];
+  /* "Island loop copy", then "copy 2" — not "copy copy". */
+  const base=src.name.replace(/ copy( \d+)?$/,'');
+  let name=base+' copy', n=2;
+  while(S.routes.some(r=>r.name===name)) name=base+' copy '+(n++);
+  const nid='r'+Date.now();
+  S.routes.push({ id:nid, name, hue, stops:[...(id===S.activeRoute? S.route : src.stops||[])] });
+  const p=S.plans[id];
+  if(p) S.plans[nid]={ start:p.start, days:(p.days||[]).map(d=>[...d]), dep:{...p.dep} };
+  if(!S.shown.includes(nid)){
+    if(S.shown.length>=5) S.shown.shift();
+    S.shown.push(nid);
+  }
+  setActiveRoute(nid);
+}
 function newRoute(){
   const used=S.routes.map(r=>r.hue);
   const hue=HUES.find(h=>!used.includes(h)) ?? HUES[S.routes.length%HUES.length];
@@ -3363,6 +3398,9 @@ function sidebar(){
       <span class="rt-meta">${s.n>1? distLbl(s.d)+' '+unitTxt()+' · '+hm(s.t) : s.n? '1 stop':'empty'}</span>
       <span class="rt-act">
         <button class="btn btn-ghost mini" data-ract="rename" title="Rename">✎</button>
+        <button class="btn btn-ghost mini" data-ract="dup" title="Duplicate this route" aria-label="Duplicate ${r.name}">
+          <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.2" y="1.2" width="7" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.4 10.8 H10.8 V4.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         ${S.routes.length>1? '<button class="btn btn-ghost mini" data-ract="del" title="Delete route">×</button>':''}
       </span>
     </div>`;
@@ -5101,6 +5139,7 @@ document.getElementById('routesList').addEventListener('click', e=>{
   }
   if(act==='pick') setActiveRoute(id);
   if(act==='rename') rEditing = rEditing===id? null : id;
+  if(act==='dup') duplicateRoute(id);
   if(act==='del'){
     const rr=rt(id), n=rr? stopsOf(id).length : 0;
     if(!confirm('Delete route "'+(rr?rr.name:id)+'"?'+(n? ' It has '+n+' stop'+(n>1?'s':'')+'.':''))) return;
