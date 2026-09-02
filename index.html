@@ -8,11 +8,11 @@
      landscape. See the --safe-* tokens. Nothing sets user-scalable, so
      pinch-zoom stays available. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Catalina Wine and Cheese Fest v12 — Southern California Bight</title>
+<title>Bight Club v12 — Southern California sail planner</title>
 <meta name="description" content="Plan sailing legs across the Southern California Bight: distance and sail time between harbours and Channel Islands anchorages, wind and tacking factored in, with route comparison.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161826'/%3E%3Cpath d='M16 6 L20.5 22 H11.5 Z' fill='%239184d9'/%3E%3Cpath d='M7 25 h18' stroke='%239184d9' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Catalina Wine and Cheese Fest v12 — Southern California Bight">
+<meta property="og:title" content="Bight Club v12 — Southern California sail planner">
 <meta property="og:description" content="Distances, sail time, weather windows and a day-by-day plan for the Channel Islands. Planning only — not for navigation.">
 <!-- twitter:card promised a large image and there was none, so a link texted
      between crew previewed as a bare text card. og.png is the app itself at
@@ -25,7 +25,7 @@
 <meta property="og:image" content="https://dominotwo.github.io/sail-planner/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The Catalina Wine and Cheese Fest v12 chart, with a passage drawn from Newport Harbor out to Santa Barbara Island and back by way of Avalon.">
+<meta property="og:image:alt" content="The Bight Club v12 chart, with a passage drawn from Newport Harbor out to Santa Barbara Island and back by way of Avalon.">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://dominotwo.github.io/sail-planner/">
 <!-- Kept in step with the palette by all(); this is the value Dusk uses, so the
@@ -1948,7 +1948,7 @@
   <style>.app, .skip { display:none !important; }</style>
   <div class="noscript">
     <h2>This one needs JavaScript.</h2>
-    <p>Catalina Wine and Cheese Fest v12 works out distances threaded around the islands, sail time
+    <p>Bight Club v12 works out distances threaded around the islands, sail time
     against a wind you set, and a day-by-day plan with sun, moon and tide — all
     of it in the browser, with no server to fall back on. With scripting off
     there is nothing to show you.</p>
@@ -1986,7 +1986,7 @@
           <path d="M5.5 27 h21" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/>
         </svg>
         <div class="brand-txt">
-          <h1 class="brand">Catalina Wine and Cheese Fest v12</h1>
+          <h1 class="brand">Bight Club v12</h1>
           <div class="brand-sub">Southern California Bight</div>
         </div>
       </div>
@@ -2045,7 +2045,7 @@
       <div class="hint" id="hint">Click the map to drop a new location · Esc to cancel</div>
       <div class="botread" id="botRead" hidden></div>
       <div class="welcome" id="welcome" data-on="false">
-        <div class="wtitle">Catalina Wine and Cheese Fest v12</div>
+        <div class="wtitle">Bight Club v12</div>
         <div class="wsub">Distances, sail time and a day-by-day plan for the Southern California Bight.</div>
         <ol class="wsteps">
           <li>A sample passage is already drawn — Newport out to Emerald Bay, Santa Barbara Island and Avalon.</li>
@@ -5195,7 +5195,7 @@ document.getElementById('gpxBtn').addEventListener('click', ()=>{
   const pts=S.route.map(id=>byId(id)).filter(Boolean);
   const esc=s=>s.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
   const gpx=`<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Catalina Wine and Cheese Fest v12" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Bight Club v12" xmlns="http://www.topografix.com/GPX/1/1">
   <rte><name>${esc(r.name)}</name>
 ${pts.map(p=>`    <rtept lat="${p.lat}" lon="${p.lon}"><name>${esc(p.name)}</name></rtept>`).join('\n')}
   </rte>
@@ -5267,7 +5267,7 @@ document.getElementById('planIcs').addEventListener('click', ()=>{
   const stamp = new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+Z$/,'Z');
   const esc = s => String(s).replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
   const fold = l => l.length<=74? l : l.match(/.{1,74}/g).join('\r\n ');
-  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Catalina Wine and Cheese Fest v12//Plan//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Bight Club v12//Plan//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
            'X-WR-CALNAME:'+esc(x.r.name+' — sailing plan')];
   x.S2.days.forEach(d=>{
     const sun = d.sun&&d.sun.rise? 'Sunrise '+CLK(d.sun.rise)+', sunset '+CLK(d.sun.set) : '';
